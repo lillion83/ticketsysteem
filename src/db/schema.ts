@@ -20,6 +20,86 @@ export const scanResultaat = pgEnum('scan_resultaat', [
   'groen_re_entry',
 ])
 
+// --- Better Auth (core) ---
+// Infrastructuurtabellen van Better Auth. Bewust Engelse camelCase-veldnamen:
+// de drizzle-adapter matcht op deze JS-sleutels. DB-kolommen blijven snake_case
+// (projectconventie). Ids zijn uuid zodat ze aansluiten op de rest van het schema
+// (auth-config: advanced.database.generateId = 'uuid'). Organization-plugin komt
+// pas in fase 2; voor nu draagt de user zijn organization_id mee (harde regel 3).
+export const user = pgTable('user', {
+  id: uuid('id').primaryKey(),
+  name: text('name').notNull(),
+  email: text('email').notNull().unique(),
+  emailVerified: boolean('email_verified').notNull().default(false),
+  image: text('image'),
+  // Tenant van de ingelogde gebruiker. Elke gescoopte query leest hierop.
+  organizationId: uuid('organization_id').references(() => organizations.id),
+  createdAt: timestamp('created_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+})
+
+export const session = pgTable('session', {
+  id: uuid('id').primaryKey(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  token: text('token').notNull().unique(),
+  ipAddress: text('ip_address'),
+  userAgent: text('user_agent'),
+  userId: uuid('user_id')
+    .notNull()
+    .references(() => user.id, { onDelete: 'cascade' }),
+  createdAt: timestamp('created_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+})
+
+export const account = pgTable('account', {
+  id: uuid('id').primaryKey(),
+  accountId: text('account_id').notNull(),
+  providerId: text('provider_id').notNull(),
+  userId: uuid('user_id')
+    .notNull()
+    .references(() => user.id, { onDelete: 'cascade' }),
+  accessToken: text('access_token'),
+  refreshToken: text('refresh_token'),
+  idToken: text('id_token'),
+  accessTokenExpiresAt: timestamp('access_token_expires_at', {
+    withTimezone: true,
+  }),
+  refreshTokenExpiresAt: timestamp('refresh_token_expires_at', {
+    withTimezone: true,
+  }),
+  scope: text('scope'),
+  password: text('password'),
+  createdAt: timestamp('created_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+})
+
+export const verification = pgTable('verification', {
+  id: uuid('id').primaryKey(),
+  identifier: text('identifier').notNull(),
+  value: text('value').notNull(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+})
+
+// --- Domein ---
+
 export const organizations = pgTable('organizations', {
   id: uuid('id').primaryKey().defaultRandom(),
   naam: text('naam').notNull(),
@@ -96,8 +176,11 @@ export const tickets = pgTable(
     koper_telefoon: text('koper_telefoon'),
     koper_email: text('koper_email'),
     verkocht_op: timestamp('verkocht_op', { withTimezone: true }),
-    // FK naar de user-tabel volgt zodra Better Auth er staat (Fase A, latere stap).
-    verkocht_door_user_id: uuid('verkocht_door_user_id'),
+    // Verwijst naar de verkopende gebruiker (Better Auth). Nu altijd Amresh;
+    // straks kan het de organisator zijn zonder migratie (PLAN §8).
+    verkocht_door_user_id: uuid('verkocht_door_user_id').references(
+      () => user.id,
+    ),
     verkoopkanaal: text('verkoopkanaal'),
     geleverd_via: text('geleverd_via'),
     geleverd_op: timestamp('geleverd_op', { withTimezone: true }),
