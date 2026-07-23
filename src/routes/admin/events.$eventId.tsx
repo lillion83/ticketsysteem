@@ -40,7 +40,7 @@ function EventDetail() {
         eventId={event.id}
         types={types.map((t) => ({ id: t.id, naam: t.naam }))}
       />
-      <VerkooplijstSectie eventId={event.id} />
+      <VerkooplijstSectie />
     </div>
   )
 }
@@ -487,27 +487,29 @@ function UitgifteSectie({
   )
 }
 
-type TicketRij = Awaited<ReturnType<typeof listTickets>>[number]
-
-function VerkooplijstSectie({ eventId }: { eventId: string }) {
+function VerkooplijstSectie() {
+  // Lijst komt altijd rechtstreeks uit de loader-data, zodat nieuw uitgegeven of
+  // ingetrokken tickets meteen kloppen na router.invalidate(). Zoeken filtert
+  // lokaal — onder de 200 tickets is de hele lijst toch al in het geheugen.
   const { tickets } = Route.useLoaderData()
+  const router = useRouter()
   const [zoek, setZoek] = useState('')
-  const [rijen, setRijen] = useState<TicketRij[] | null>(null)
 
-  const lijst = rijen ?? tickets
-
-  async function zoeken(e: React.FormEvent) {
-    e.preventDefault()
-    const resultaat = await listTickets({ data: { eventId, zoek } })
-    setRijen(resultaat)
-  }
+  const term = zoek.trim().toLowerCase()
+  const lijst = term
+    ? tickets.filter(
+        (t) =>
+          (t.koper_naam ?? '').toLowerCase().includes(term) ||
+          (t.koper_telefoon ?? '').toLowerCase().includes(term) ||
+          (t.koper_email ?? '').toLowerCase().includes(term),
+      )
+    : tickets
 
   async function intrekken(ticketId: string) {
     const reden = window.prompt('Reden voor intrekken?')
     if (reden === null) return
     await revokeTicket({ data: { ticketId, reden } })
-    const resultaat = await listTickets({ data: { eventId, zoek } })
-    setRijen(resultaat)
+    await router.invalidate()
   }
 
   return (
@@ -516,20 +518,12 @@ function VerkooplijstSectie({ eventId }: { eventId: string }) {
         <h2 className="text-lg font-semibold">
           Verkooplijst ({lijst.length})
         </h2>
-        <form onSubmit={zoeken} className="flex gap-2">
-          <input
-            value={zoek}
-            onChange={(e) => setZoek(e.target.value)}
-            placeholder="Zoek op naam, telefoon, e-mail"
-            className="rounded border border-gray-300 px-3 py-1 text-sm"
-          />
-          <button
-            type="submit"
-            className="rounded border border-gray-300 px-3 py-1 text-sm hover:bg-gray-50"
-          >
-            Zoeken
-          </button>
-        </form>
+        <input
+          value={zoek}
+          onChange={(e) => setZoek(e.target.value)}
+          placeholder="Zoek op naam, telefoon, e-mail"
+          className="rounded border border-gray-300 px-3 py-1 text-sm"
+        />
       </div>
 
       <table className="w-full border border-gray-200 text-sm">
