@@ -99,6 +99,8 @@ export const listTickets = createServerFn({ method: 'GET' })
         koper_telefoon: tickets.koper_telefoon,
         koper_email: tickets.koper_email,
         verkocht_op: tickets.verkocht_op,
+        geleverd_via: tickets.geleverd_via,
+        geleverd_op: tickets.geleverd_op,
         gebruikt_op: tickets.gebruikt_op,
         ingetrokken_op: tickets.ingetrokken_op,
         ingetrokken_reden: tickets.ingetrokken_reden,

@@ -7,15 +7,22 @@ import {
   updateTicketType,
 } from '#/server/ticketTypes'
 import { issueTicket, listTickets, revokeTicket } from '#/server/tickets'
+import {
+  getPublicBaseUrl,
+  markDelivered,
+  sendTicketMail,
+} from '#/server/delivery'
+import { ticketBericht, whatsappLink } from '#/lib/whatsapp'
 
 export const Route = createFileRoute('/admin/events/$eventId')({
   loader: async ({ params }) => {
-    const [event, types, tickets] = await Promise.all([
+    const [event, types, tickets, baseUrl] = await Promise.all([
       getEvent({ data: params.eventId }),
       listTicketTypes({ data: params.eventId }),
       listTickets({ data: { eventId: params.eventId } }),
+      getPublicBaseUrl(),
     ])
-    return { event, types, tickets }
+    return { event, types, tickets, baseUrl }
   },
   component: EventDetail,
 })
@@ -363,6 +370,94 @@ function TypeForm({
   )
 }
 
+type LeverbaarTicket = {
+  id: string
+  code: string
+  koper_naam: string | null
+  koper_telefoon: string | null
+  koper_email: string | null
+}
+
+/**
+ * Levering van één ticket: link naar de publieke ticketpagina, WhatsApp met
+ * voorgevulde tekst, en mail via Brevo. Zelfde knoppen direct na uitgifte en in
+ * de verkooplijst, zodat versturen nooit een omweg is.
+ */
+function LeverKnoppen({ ticket }: { ticket: LeverbaarTicket }) {
+  const { event, baseUrl } = Route.useLoaderData()
+  const router = useRouter()
+  const [bezig, setBezig] = useState(false)
+  const [fout, setFout] = useState<string | null>(null)
+
+  const url = `${baseUrl}/t/${ticket.code}`
+  const waLink = whatsappLink(
+    ticket.koper_telefoon,
+    ticketBericht({
+      koperNaam: ticket.koper_naam,
+      eventNaam: event.naam,
+      datum: event.datum_start,
+      locatie: event.locatie,
+      ticketUrl: url,
+    }),
+  )
+
+  async function viaWhatsapp() {
+    if (!waLink) return
+    // Eerst openen (binnen de klik, anders blokkeert de browser het venster),
+    // daarna pas de levering vastleggen.
+    window.open(waLink, '_blank', 'noopener')
+    try {
+      await markDelivered({ data: { ticketId: ticket.id, kanaal: 'whatsapp' } })
+      router.invalidate()
+    } catch (err) {
+      setFout(err instanceof Error ? err.message : 'Markeren mislukt')
+    }
+  }
+
+  async function viaMail() {
+    setFout(null)
+    setBezig(true)
+    try {
+      await sendTicketMail({ data: { ticketId: ticket.id } })
+      router.invalidate()
+    } catch (err) {
+      setFout(err instanceof Error ? err.message : 'Mail versturen mislukt')
+    } finally {
+      setBezig(false)
+    }
+  }
+
+  return (
+    <span className="inline-flex items-center gap-3 whitespace-nowrap">
+      <a
+        href={url}
+        target="_blank"
+        rel="noreferrer"
+        className="text-blue-600 hover:underline"
+      >
+        ticket
+      </a>
+      <button
+        onClick={viaWhatsapp}
+        disabled={!waLink}
+        title={waLink ? undefined : 'Geen bruikbaar telefoonnummer'}
+        className="text-green-700 hover:underline disabled:text-gray-400 disabled:no-underline"
+      >
+        whatsapp
+      </button>
+      <button
+        onClick={viaMail}
+        disabled={bezig || !ticket.koper_email}
+        title={ticket.koper_email ? undefined : 'Geen e-mailadres'}
+        className="text-blue-600 hover:underline disabled:text-gray-400 disabled:no-underline"
+      >
+        {bezig ? 'bezig…' : 'mail'}
+      </button>
+      {fout && <span className="text-xs text-red-600">{fout}</span>}
+    </span>
+  )
+}
+
 function UitgifteSectie({
   eventId,
   types,
@@ -377,13 +472,13 @@ function UitgifteSectie({
   const [email, setEmail] = useState('')
   const [kanaal, setKanaal] = useState('')
   const [fout, setFout] = useState<string | null>(null)
-  const [melding, setMelding] = useState<string | null>(null)
+  const [laatste, setLaatste] = useState<LeverbaarTicket | null>(null)
   const [bezig, setBezig] = useState(false)
 
   async function verkopen(e: React.FormEvent) {
     e.preventDefault()
     setFout(null)
-    setMelding(null)
+    setLaatste(null)
     setBezig(true)
     try {
       const ticket = await issueTicket({
@@ -396,7 +491,13 @@ function UitgifteSectie({
           verkoopkanaal: kanaal || null,
         },
       })
-      setMelding(`Ticket uitgegeven voor ${ticket.koper_naam}.`)
+      setLaatste({
+        id: ticket.id,
+        code: ticket.code,
+        koper_naam: ticket.koper_naam,
+        koper_telefoon: ticket.koper_telefoon,
+        koper_email: ticket.koper_email,
+      })
       setNaam('')
       setTelefoon('')
       setEmail('')
@@ -413,9 +514,7 @@ function UitgifteSectie({
     <section>
       <h2 className="mb-3 text-lg font-semibold">Ticket uitgeven</h2>
       {types.length === 0 ? (
-        <p className="text-sm text-gray-500">
-          Maak eerst een tickettype aan.
-        </p>
+        <p className="text-sm text-gray-500">Maak eerst een tickettype aan.</p>
       ) : (
         <form
           onSubmit={verkopen}
@@ -473,7 +572,14 @@ function UitgifteSectie({
             </label>
           </div>
           {fout && <p className="text-sm text-red-600">{fout}</p>}
-          {melding && <p className="text-sm text-green-700">{melding}</p>}
+          {laatste && (
+            <div className="flex flex-wrap items-center gap-3 rounded bg-green-50 px-3 py-2 text-sm text-green-800">
+              <span>
+                Ticket uitgegeven voor {laatste.koper_naam}. Versturen:
+              </span>
+              <LeverKnoppen ticket={laatste} />
+            </div>
+          )}
           <button
             type="submit"
             disabled={bezig}
@@ -515,9 +621,7 @@ function VerkooplijstSectie() {
   return (
     <section>
       <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-lg font-semibold">
-          Verkooplijst ({lijst.length})
-        </h2>
+        <h2 className="text-lg font-semibold">Verkooplijst ({lijst.length})</h2>
         <input
           value={zoek}
           onChange={(e) => setZoek(e.target.value)}
@@ -533,6 +637,8 @@ function VerkooplijstSectie() {
             <th className="px-3 py-2">Type</th>
             <th className="px-3 py-2">Contact</th>
             <th className="px-3 py-2">Status</th>
+            <th className="px-3 py-2">Levering</th>
+            <th className="px-3 py-2"></th>
             <th className="px-3 py-2"></th>
           </tr>
         </thead>
@@ -553,6 +659,33 @@ function VerkooplijstSectie() {
                   <span className="text-green-700">geldig</span>
                 )}
               </td>
+              <td className="px-3 py-2 text-gray-600">
+                {t.geleverd_via ? (
+                  <>
+                    {t.geleverd_via}
+                    {t.geleverd_op && (
+                      <span className="block text-xs text-gray-400">
+                        {new Date(t.geleverd_op).toLocaleString('nl-NL')}
+                      </span>
+                    )}
+                  </>
+                ) : (
+                  '—'
+                )}
+              </td>
+              <td className="px-3 py-2">
+                {!t.ingetrokken_op && (
+                  <LeverKnoppen
+                    ticket={{
+                      id: t.id,
+                      code: t.code,
+                      koper_naam: t.koper_naam,
+                      koper_telefoon: t.koper_telefoon,
+                      koper_email: t.koper_email,
+                    }}
+                  />
+                )}
+              </td>
               <td className="px-3 py-2 text-right">
                 {!t.ingetrokken_op && (
                   <button
@@ -567,7 +700,7 @@ function VerkooplijstSectie() {
           ))}
           {lijst.length === 0 && (
             <tr>
-              <td colSpan={5} className="px-3 py-3 text-gray-500">
+              <td colSpan={7} className="px-3 py-3 text-gray-500">
                 Geen tickets.
               </td>
             </tr>
