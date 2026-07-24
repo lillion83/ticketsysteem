@@ -21,6 +21,12 @@ export const auth = betterAuth({
   // Ids als uuid zodat ze aansluiten op het uuid-schema (o.a. de FK
   // tickets.verkocht_door_user_id → user.id).
   advanced: {
+    // Eigen cookienaam (`ticketsysteem.session_token`). Cookies worden niet
+    // gescheiden per poort, alleen per host: op localhost deelt deze app z'n
+    // cookies met elk ander project dat daar draait. Met de standaardnaam
+    // `better-auth.session_token` overschrijven twee Better Auth-apps elkaars
+    // sessie, wat zich uit als "inloggen lukt, maar /admin stuurt je terug".
+    cookiePrefix: 'ticketsysteem',
     database: {
       generateId: () => randomUUID(),
     },
