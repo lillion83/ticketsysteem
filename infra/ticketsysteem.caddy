@@ -1,0 +1,23 @@
+# Caddy-siteblok voor het ticketsysteem.
+#
+# Plaatsing op de VPS: /etc/caddy/sites/ticketsysteem.caddy
+# De hoofd-Caddyfile (/etc/caddy/Caddyfile) leest die map in met:
+#     import /etc/caddy/sites/*.caddy
+#
+# Caddy vraagt zelf een Let's Encrypt-certificaat aan via de HTTP-validatie op
+# poort 80. Geen API-token nodig: dit is een gewoon subdomein, geen wildcard
+# (anders dan de Cloudflare-opzet van webwinkri).
+#
+# VEREIST: DNS-A-record  tickets.mijnonline.shop -> 162.35.176.40
+
+tickets.mijnonline.shop {
+	encode zstd gzip
+
+	# De app draait onder PM2 op 3100. Die poort staat bewust NIET open in de
+	# firewall: al het verkeer hoort via Caddy (https) binnen te komen.
+	reverse_proxy localhost:3100 {
+		# Echte client-IP en schema doorgeven aan de app.
+		header_up X-Forwarded-For {remote_host}
+		header_up X-Forwarded-Proto {scheme}
+	}
+}
