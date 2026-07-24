@@ -15,9 +15,6 @@ tickets.mijnonline.shop {
 
 	# De app draait onder PM2 op 3100. Die poort staat bewust NIET open in de
 	# firewall: al het verkeer hoort via Caddy (https) binnen te komen.
-	reverse_proxy localhost:3100 {
-		# Echte client-IP en schema doorgeven aan de app.
-		header_up X-Forwarded-For {remote_host}
-		header_up X-Forwarded-Proto {scheme}
-	}
+	# X-Forwarded-For/-Proto zet Caddy zelf al; expliciet doorgeven is overbodig.
+	reverse_proxy localhost:3100
 }
