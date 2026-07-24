@@ -4,6 +4,23 @@ import { signIn } from '#/lib/auth-client'
 
 export const Route = createFileRoute('/login')({ component: LoginPage })
 
+/**
+ * Vertaalt de foutcode van Better Auth. Een verkeerd wachtwoord en een
+ * configuratiefout gaven eerder dezelfde tekst, waardoor een poortmismatch
+ * (BETTER_AUTH_URL ≠ de poort waarop de app draait) eruitzag als een
+ * wachtwoordprobleem. Alleen de inloggegevens blijven bewust vaag.
+ */
+function foutTekst(code: string | undefined): string {
+  switch (code) {
+    case 'INVALID_ORIGIN':
+      return 'Configuratiefout: BETTER_AUTH_URL in .env komt niet overeen met het adres waarop de app draait. Zet daar dezelfde poort neer en herstart de server.'
+    case 'INVALID_EMAIL_OR_PASSWORD':
+      return 'Inloggen mislukt. Controleer e-mail en wachtwoord.'
+    default:
+      return `Inloggen mislukt${code ? ` (${code})` : ''}. Controleer e-mail en wachtwoord, of kijk in de serverlog.`
+  }
+}
+
 function LoginPage() {
   const navigate = useNavigate()
   const [email, setEmail] = useState('')
@@ -18,7 +35,7 @@ function LoginPage() {
     const { error } = await signIn.email({ email, password: wachtwoord })
     setBezig(false)
     if (error) {
-      setFout('Inloggen mislukt. Controleer e-mail en wachtwoord.')
+      setFout(foutTekst(error.code))
       return
     }
     navigate({ to: '/admin' })
