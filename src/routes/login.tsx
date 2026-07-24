@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { createFileRoute, useNavigate, useRouter } from '@tanstack/react-router'
 import { useState } from 'react'
 import { signIn } from '#/lib/auth-client'
 
@@ -23,6 +23,7 @@ function foutTekst(code: string | undefined): string {
 
 function LoginPage() {
   const navigate = useNavigate()
+  const router = useRouter()
   const [email, setEmail] = useState('')
   const [wachtwoord, setWachtwoord] = useState('')
   const [fout, setFout] = useState<string | null>(null)
@@ -38,6 +39,10 @@ function LoginPage() {
       setFout(foutTekst(error.code))
       return
     }
+    // De router heeft /admin al beoordeeld toen we nog uitgelogd waren en houdt
+    // dat oordeel vast. Zonder invalidate draait beforeLoad niet opnieuw en
+    // stuurt /admin je terug naar /login, hoe geldig de nieuwe sessie ook is.
+    await router.invalidate()
     navigate({ to: '/admin' })
   }
 
