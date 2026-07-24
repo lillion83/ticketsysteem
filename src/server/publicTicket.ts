@@ -1,4 +1,4 @@
-import { createServerFn } from '@tanstack/react-start'
+import { createServerFn, createServerOnlyFn } from '@tanstack/react-start'
 import { eq } from 'drizzle-orm'
 import { db } from '#/db/index'
 import { events, ticketTypes, tickets } from '#/db/schema'
@@ -28,10 +28,16 @@ export type PublicTicket = {
 export const TICKET_NIET_GEVONDEN = 'Ticket niet gevonden'
 
 /**
- * Zoekt en verifieert een ticket op zijn publieke code. Server-only helper,
- * gedeeld door de ticketpagina en de qr.png-route.
+ * Zoekt en verifieert een ticket op zijn publieke code. Gedeeld door de
+ * ticketpagina en de qr-route.
+ *
+ * `createServerOnlyFn` is hier geen sierlaag: dit is een gewone export, en de
+ * ticketpagina importeert deze module. Zonder die wikkel belandt de functie —
+ * en via verifyTicketCode dus de crypto-module en Buffer — in de client-bundel.
+ * Die crasht dan met "Buffer is not defined", React hydrateert niet meer, en
+ * elk formulier in de app valt terug op een gewone HTML-submit.
  */
-export async function laadPublicTicket(
+export const laadPublicTicket = createServerOnlyFn(async function laden(
   code: string,
 ): Promise<PublicTicket | null> {
   if (!code || code.length > 200) return null
@@ -81,7 +87,7 @@ export async function laadPublicTicket(
     status,
     gebruikt_op: rij.gebruikt_op,
   }
-}
+})
 
 /**
  * Loader-variant voor /t/{code}. Genereert de QR serverside mee, zodat de

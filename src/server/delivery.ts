@@ -12,8 +12,11 @@ import { qrPng } from '#/lib/qr'
 
 export type Leverkanaal = 'mail' | 'whatsapp'
 
+// Niet exporteren: de admin-route importeert deze module, en elke gewone export
+// blijft in de client-bundel staan met alles wat eraan hangt.
+
 /** Basis-URL waarop kopers de ticketpagina openen, zonder slash op het eind. */
-export function publicBaseUrl(): string {
+function publicBaseUrl(): string {
   const url = process.env.PUBLIC_BASE_URL || process.env.BETTER_AUTH_URL
   if (!url) {
     throw new Error('PUBLIC_BASE_URL ontbreekt in de omgeving (.env)')
@@ -22,7 +25,7 @@ export function publicBaseUrl(): string {
 }
 
 /** De publieke link naar een ticket. */
-export function ticketUrl(base: string, code: string): string {
+function ticketUrl(base: string, code: string): string {
   return `${base}/t/${code}`
 }
 
