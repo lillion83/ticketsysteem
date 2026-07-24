@@ -16,7 +16,8 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:seed": "tsx --env-file=.env src/db/seed.ts",
-    "db:seed-admin": "tsx --env-file=.env src/db/seed-admin.ts"
+    "db:seed-admin": "tsx --env-file=.env src/db/seed-admin.ts",
+    "db:reset-admin-password": "tsx --env-file=.env src/db/reset-admin-password.ts"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.18",
