@@ -1,4 +1,4 @@
-import { createFileRoute, useRouter } from '@tanstack/react-router'
+import { Link, createFileRoute, useRouter } from '@tanstack/react-router'
 import { useState } from 'react'
 import { getEvent, updateEvent } from '#/server/events'
 import {
@@ -96,12 +96,21 @@ function EventSectie() {
             {event.locatie ? ` · ${event.locatie}` : ''} · {event.status}
           </p>
         </div>
-        <button
-          onClick={() => setOpen((v) => !v)}
-          className="rounded border border-gray-300 px-3 py-1 text-sm hover:bg-gray-50"
-        >
-          {open ? 'Annuleren' : 'Bewerken'}
-        </button>
+        <div className="flex items-center gap-2">
+          <Link
+            to="/scan/$eventId"
+            params={{ eventId: event.id }}
+            className="rounded bg-black px-3 py-1 text-sm font-medium text-white"
+          >
+            Scannen
+          </Link>
+          <button
+            onClick={() => setOpen((v) => !v)}
+            className="rounded border border-gray-300 px-3 py-1 text-sm hover:bg-gray-50"
+          >
+            {open ? 'Annuleren' : 'Bewerken'}
+          </button>
+        </div>
       </div>
 
       {open && (
