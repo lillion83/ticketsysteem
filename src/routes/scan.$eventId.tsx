@@ -1,7 +1,6 @@
-import { Link, createFileRoute, redirect } from '@tanstack/react-router'
+import { Link, createFileRoute } from '@tanstack/react-router'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { getEvent } from '#/server/events'
-import { getCurrentUser } from '#/server/session'
 import { syncTickets, uploadScans } from '#/server/sync'
 import { bepaalLokaal, isGroen } from '#/lib/scanResult'
 import type { ScanUitkomst } from '#/lib/scanResult'
@@ -9,6 +8,7 @@ import {
   bewaarLijst,
   laadLijst,
   laadQueue,
+  laadToken,
   markeerGebruikt,
   voegToeAanQueue,
   verwijderUitQueue,
@@ -21,19 +21,11 @@ import { decodeFrame } from '#/lib/qrscan'
 // (offline-first, PLAN §3.3), de server krijgt de scan via een idempotente
 // uploadqueue.
 export const Route = createFileRoute('/scan/$eventId')({
-  beforeLoad: async () => {
-    // Zelfde guard als /admin: geen sessie → naar /login. Maar offline (koude
-    // start aan de deur) gooit getCurrentUser een netwerkfout — dan doorlaten en
-    // op de eerdere sessie vertrouwen. Alleen bij een écht "geen gebruiker"
-    // doorsturen. Token-toegang zonder account komt in fase F.
-    let user
-    try {
-      user = await getCurrentUser()
-    } catch {
-      return
-    }
-    if (!user) throw redirect({ to: '/login' })
-  },
+  // Geen harde login-guard: de scanner wordt óf door de ingelogde admin geopend,
+  // óf door deurpersoneel via een scannertoken (fase F, PLAN §3.5) dat alleen
+  // client-side in localStorage staat — server-side hier niet zichtbaar. De
+  // sync/upload-endpoints doen de echte autorisatie (token óf sessie). Zonder
+  // beide krijgt de gebruiker gewoon "geen lijst" te zien, geen data lekt.
   loader: async ({ params }) => {
     // Offline valt getEvent weg; de component leest de eventnaam dan uit de
     // gesyncte lijst in localStorage.
@@ -163,7 +155,9 @@ function Scanner() {
     if (queue.length === 0) return
     flushBezigRef.current = true
     try {
-      const res = await uploadScans({ data: { eventId, scans: queue } })
+      const res = await uploadScans({
+        data: { eventId, token: laadToken(eventId) ?? undefined, scans: queue },
+      })
       // De server geeft per verzonden scan een resultaat terug; die zijn nu
       // verwerkt (idempotent) en mogen uit de queue.
       const gedaan = res.resultaten.map((r) => r.client_scan_uuid)
@@ -181,7 +175,9 @@ function Scanner() {
   // --- volledige sync ---
   const syncNu = useCallback(async () => {
     try {
-      const data = await syncTickets({ data: eventId })
+      const data = await syncTickets({
+        data: { eventId, token: laadToken(eventId) ?? undefined },
+      })
       const l = bewaarLijst(eventId, {
         gesyncedOp: data.gesyncedOp,
         naam: data.naam,

@@ -6,6 +6,7 @@ import type { GesynctTicket, ScanResultaat } from '#/lib/scanResult'
 
 const LIJST_KEY = (eventId: string) => `scanner:lijst:${eventId}`
 const QUEUE_KEY = (eventId: string) => `scanner:queue:${eventId}`
+const TOKEN_KEY = (eventId: string) => `scanner:token:${eventId}`
 
 // De volledige gesyncte lijst, plus wanneer en met welke re-entry-instelling.
 export type Lijst = {
@@ -41,6 +42,28 @@ function veiligSchrijven(key: string, waarde: unknown) {
   } catch {
     // localStorage vol of geblokkeerd: de in-memory state blijft leidend,
     // dit is enkel de back-up bij een herstart.
+  }
+}
+
+// --- scannertoken (fase F) ---
+// Deurpersoneel koppelt via /s/{token}; het token wordt hier bewaard en
+// meegestuurd bij sync/upload. Ruwe string, niet JSON.
+
+export function laadToken(eventId: string): string | null {
+  if (typeof window === 'undefined') return null
+  try {
+    return window.localStorage.getItem(TOKEN_KEY(eventId))
+  } catch {
+    return null
+  }
+}
+
+export function bewaarToken(eventId: string, token: string) {
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.setItem(TOKEN_KEY(eventId), token)
+  } catch {
+    // localStorage geblokkeerd: dan werkt alleen de ingelogde-admin-route.
   }
 }
 

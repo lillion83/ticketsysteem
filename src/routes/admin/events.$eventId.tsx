@@ -98,6 +98,13 @@ function EventSectie() {
         </div>
         <div className="flex items-center gap-2">
           <Link
+            to="/admin/events/$eventId/deur"
+            params={{ eventId: event.id }}
+            className="rounded border border-gray-300 px-3 py-1 text-sm hover:bg-gray-50"
+          >
+            Deur &amp; rapportage
+          </Link>
+          <Link
             to="/scan/$eventId"
             params={{ eventId: event.id }}
             className="rounded bg-black px-3 py-1 text-sm font-medium text-white"

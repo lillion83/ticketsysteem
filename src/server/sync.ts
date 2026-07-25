@@ -2,14 +2,15 @@ import { createServerFn } from '@tanstack/react-start'
 import { and, eq, gt, isNull } from 'drizzle-orm'
 import { db } from '#/db/index'
 import { events, scans, tickets } from '#/db/schema'
-import { requireAuth } from '#/server/session'
+import { resolveScanContext, raakSessieAan } from '#/server/scannerSessions'
 import { verifyTicketCode } from '#/lib/ticketcode'
 import type { GesynctTicket, ScanResultaat } from '#/lib/scanResult'
 
 // Fase E — de offline-laag. Twee endpoints:
 //   syncTickets  : de volledige lijst voor het event (PLAN §3.3, geen delta).
 //   uploadScans  : idempotente batch-upload van (groene) scans.
-// Alles org-gescoopt (harde regel 3).
+// Fase F: beide accepteren een scannertoken (deurpersoneel zonder account),
+// anders valt het terug op de ingelogde admin. Alles org-gescoopt (harde regel 3).
 
 // --- sync: volledige lijst ophalen ---
 
@@ -21,12 +22,16 @@ export type SyncRespons = {
 }
 
 export const syncTickets = createServerFn({ method: 'GET' })
-  .validator((eventId: string) => {
-    if (!eventId) throw new Error('eventId ontbreekt')
-    return eventId
+  .validator((data: { eventId: string; token?: string }) => {
+    if (!data.eventId) throw new Error('eventId ontbreekt')
+    return { eventId: data.eventId, token: data.token }
   })
-  .handler(async ({ data: eventId }): Promise<SyncRespons> => {
-    const { organizationId } = await requireAuth()
+  .handler(async ({ data }): Promise<SyncRespons> => {
+    const { organizationId, scannerSessieId } = await resolveScanContext(
+      data.eventId,
+      data.token,
+    )
+    const eventId = data.eventId
 
     const ev = await db
       .select({ naam: events.naam, reEntry: events.re_entry_toegestaan })
@@ -52,6 +57,9 @@ export const syncTickets = createServerFn({ method: 'GET' })
           eq(tickets.organization_id, organizationId),
         ),
       )
+
+    // Laat de admin zien dat deze scanner leeft (PLAN §3.4).
+    if (scannerSessieId) await raakSessieAan(scannerSessieId)
 
     return {
       gesyncedOp: new Date().toISOString(),
@@ -86,22 +94,32 @@ function parseTijd(iso: string): Date {
 }
 
 export const uploadScans = createServerFn({ method: 'POST' })
-  .validator((data: { eventId: string; scans: WachtScanInput[] }) => {
-    if (!data.eventId) throw new Error('eventId ontbreekt')
-    if (!Array.isArray(data.scans)) throw new Error('scans ontbreekt')
-    return data
-  })
+  .validator(
+    (data: { eventId: string; token?: string; scans: WachtScanInput[] }) => {
+      if (!data.eventId) throw new Error('eventId ontbreekt')
+      if (!Array.isArray(data.scans)) throw new Error('scans ontbreekt')
+      return data
+    },
+  )
   .handler(
     async ({ data }): Promise<{ resultaten: UploadResultaat[] }> => {
-      const { userId, organizationId } = await requireAuth()
+      const { organizationId, scannerSessieId, actorId } =
+        await resolveScanContext(data.eventId, data.token)
       const { eventId } = data
 
       const resultaten: UploadResultaat[] = []
       for (const scan of data.scans) {
         resultaten.push(
-          await verwerkScan(scan, eventId, organizationId, userId),
+          await verwerkScan(
+            scan,
+            eventId,
+            organizationId,
+            actorId,
+            scannerSessieId,
+          ),
         )
       }
+      if (scannerSessieId) await raakSessieAan(scannerSessieId)
       return { resultaten }
     },
   )
@@ -110,7 +128,8 @@ async function verwerkScan(
   scan: WachtScanInput,
   eventId: string,
   organizationId: string,
-  userId: string,
+  actorId: string,
+  scannerSessieId: string | null,
 ): Promise<UploadResultaat> {
   const { client_scan_uuid, code } = scan
   const tijdstipClient = parseTijd(scan.tijdstip_client)
@@ -140,7 +159,7 @@ async function verwerkScan(
   //    betekenis houdt over het offline-venster.
   const gemarkeerd = await db
     .update(tickets)
-    .set({ gebruikt_op: tijdstipClient, gebruikt_door: userId })
+    .set({ gebruikt_op: tijdstipClient, gebruikt_door: actorId })
     .where(
       and(
         eq(tickets.code, code),
@@ -152,7 +171,7 @@ async function verwerkScan(
     )
     .returning({ id: tickets.id })
   if (gemarkeerd.length > 0) {
-    await logScan(gemarkeerd[0].id, eventId, organizationId, scan, 'groen')
+    await logScan(gemarkeerd[0].id, eventId, organizationId, scannerSessieId, scan, 'groen')
     return { client_scan_uuid, resultaat: 'groen', gebruikt_op: null }
   }
 
@@ -181,13 +200,13 @@ async function verwerkScan(
   const rij = rows[0]
 
   if (rij.ingetrokken_op) {
-    await logScan(rij.id, eventId, organizationId, scan, 'rood_ingetrokken')
+    await logScan(rij.id, eventId, organizationId, scannerSessieId, scan, 'rood_ingetrokken')
     return { client_scan_uuid, resultaat: 'rood_ingetrokken', gebruikt_op: null }
   }
 
   if (rij.gebruikt_op) {
     if (rij.reEntry) {
-      await logScan(rij.id, eventId, organizationId, scan, 'groen_re_entry')
+      await logScan(rij.id, eventId, organizationId, scannerSessieId, scan, 'groen_re_entry')
       return { client_scan_uuid, resultaat: 'groen_re_entry', gebruikt_op: null }
     }
     // Conflict: twee scanners claimden hetzelfde ticket offline. Vroegste
@@ -204,7 +223,7 @@ async function verwerkScan(
           gt(tickets.gebruikt_op, tijdstipClient),
         ),
       )
-    await logScan(rij.id, eventId, organizationId, scan, 'rood_al_gebruikt')
+    await logScan(rij.id, eventId, organizationId, scannerSessieId, scan, 'rood_al_gebruikt')
     return {
       client_scan_uuid,
       resultaat: 'rood_al_gebruikt',
@@ -220,17 +239,19 @@ async function logScan(
   ticketId: string,
   eventId: string,
   organizationId: string,
+  scannerSessieId: string | null,
   scan: WachtScanInput,
   resultaat: ScanResultaat,
 ) {
   // onConflictDoNothing dekt de race waarin dezelfde uuid gelijktijdig binnenkomt
-  // (harde regel 4). scanner_sessie_id blijft null tot fase F.
+  // (harde regel 4).
   await db
     .insert(scans)
     .values({
       ticket_id: ticketId,
       event_id: eventId,
       organization_id: organizationId,
+      scanner_sessie_id: scannerSessieId,
       tijdstip_client: parseTijd(scan.tijdstip_client),
       resultaat,
       client_scan_uuid: scan.client_scan_uuid,
