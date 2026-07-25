@@ -13,6 +13,7 @@ import {
   sendTicketMail,
 } from '#/server/delivery'
 import { ticketBericht, whatsappLink } from '#/lib/whatsapp'
+import { kortCode } from '#/lib/scanResult'
 
 export const Route = createFileRoute('/admin/events/$eventId')({
   loader: async ({ params }) => {
@@ -591,7 +592,11 @@ function UitgifteSectie({
           {laatste && (
             <div className="flex flex-wrap items-center gap-3 rounded bg-green-50 px-3 py-2 text-sm text-green-800">
               <span>
-                Ticket uitgegeven voor {laatste.koper_naam}. Versturen:
+                Ticket uitgegeven voor {laatste.koper_naam} (code{' '}
+                <span className="font-mono font-semibold tracking-wider">
+                  {kortCode(laatste.code)}
+                </span>
+                ). Versturen:
               </span>
               <LeverKnoppen ticket={laatste} />
             </div>
@@ -651,6 +656,7 @@ function VerkooplijstSectie() {
           <tr>
             <th className="px-3 py-2">Naam</th>
             <th className="px-3 py-2">Type</th>
+            <th className="px-3 py-2">Code</th>
             <th className="px-3 py-2">Contact</th>
             <th className="px-3 py-2">Status</th>
             <th className="px-3 py-2">Levering</th>
@@ -663,6 +669,9 @@ function VerkooplijstSectie() {
             <tr key={t.id} className="border-t border-gray-200">
               <td className="px-3 py-2">{t.koper_naam}</td>
               <td className="px-3 py-2">{t.type_naam}</td>
+              <td className="px-3 py-2 font-mono tracking-wider text-gray-700">
+                {kortCode(t.code)}
+              </td>
               <td className="px-3 py-2 text-gray-600">
                 {t.koper_telefoon || t.koper_email || '—'}
               </td>
@@ -716,7 +725,7 @@ function VerkooplijstSectie() {
           ))}
           {lijst.length === 0 && (
             <tr>
-              <td colSpan={7} className="px-3 py-3 text-gray-500">
+              <td colSpan={8} className="px-3 py-3 text-gray-500">
                 Geen tickets.
               </td>
             </tr>

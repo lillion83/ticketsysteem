@@ -2,7 +2,7 @@ import { Link, createFileRoute } from '@tanstack/react-router'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { getEvent } from '#/server/events'
 import { syncTickets, uploadScans } from '#/server/sync'
-import { bepaalLokaal, isGroen } from '#/lib/scanResult'
+import { bepaalLokaal, herleidCode, isGroen } from '#/lib/scanResult'
 import type { ScanUitkomst } from '#/lib/scanResult'
 import {
   bewaarLijst,
@@ -253,10 +253,37 @@ function Scanner() {
 
   function handmatigVersturen(e: React.FormEvent) {
     e.preventDefault()
-    const code = handmatig.trim()
-    if (!code || pauzeRef.current || isVerouderd) return
+    const invoer = handmatig.trim()
+    if (!invoer || pauzeRef.current || isVerouderd) return
     setHandmatig('')
-    verwerk(code)
+
+    const lijst = lijstRef.current
+    if (!lijst) {
+      pauzeRef.current = true
+      toon({
+        groen: false,
+        titel: 'Geen lijst',
+        subtitel: 'Wacht op de eerste sync met internet',
+      })
+      return
+    }
+    // Korte code (of geplakte volledige code) herleiden naar de volledige code,
+    // zodat de server-upload de HMAC blijft verifiëren (PLAN §6).
+    const herleid = herleidCode(Object.keys(lijst.tickets), invoer)
+    if (herleid.status === 'gevonden') {
+      verwerk(herleid.code)
+      return
+    }
+    pauzeRef.current = true
+    toon(
+      herleid.status === 'ambigu'
+        ? {
+            groen: false,
+            titel: 'Niet uniek',
+            subtitel: 'Typ meer tekens of scan de QR',
+          }
+        : { groen: false, titel: 'Ongeldig', subtitel: 'Code niet gevonden' },
+    )
   }
 
   // Lijst + queue meteen uit localStorage (offline start), dan syncen en een
@@ -452,7 +479,7 @@ function Scanner() {
         <input
           value={handmatig}
           onChange={(e) => setHandmatig(e.target.value)}
-          placeholder="Code handmatig invoeren"
+          placeholder="Code invoeren (laatste 6 tekens)"
           disabled={isVerouderd}
           className="min-w-0 flex-1 rounded bg-white/10 px-3 py-2 text-sm placeholder:text-white/40 disabled:opacity-40"
         />

@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { getPublicTicket } from '#/server/publicTicket'
+import { kortCode } from '#/lib/scanResult'
 
 // Publieke ticketpagina (PLAN §3.6). Geen login: de HMAC in de URL is het
 // toegangsbewijs. Deze pagina wordt vrijwel altijd op een telefoon geopend,
@@ -20,6 +21,7 @@ function formatDatum(datum: Date | string): string {
 
 function TicketPagina() {
   const { ticket, qr } = Route.useLoaderData()
+  const { code } = Route.useParams()
   const geldig = ticket.status === 'geldig'
 
   return (
@@ -69,12 +71,17 @@ function TicketPagina() {
           <dd className="font-medium">{ticket.koper_naam ?? '—'}</dd>
           <dt className="text-gray-500">Type</dt>
           <dd className="font-medium">{ticket.type_naam}</dd>
+          <dt className="text-gray-500">Code</dt>
+          <dd className="font-mono font-medium tracking-widest">
+            {kortCode(code)}
+          </dd>
         </dl>
       </div>
 
       <p className="text-center text-xs text-gray-500">
-        Laat deze QR-code scannen bij de ingang. Tip: maak een screenshot, dan
-        werkt hij ook zonder internet.
+        Laat deze QR-code scannen bij de ingang. Lukt scannen niet, dan kan de
+        code hierboven handmatig ingevoerd worden. Tip: maak een screenshot, dan
+        werkt je ticket ook zonder internet.
       </p>
     </main>
   )

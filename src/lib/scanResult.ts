@@ -29,6 +29,36 @@ export function isGroen(resultaat: ScanResultaat): boolean {
   return resultaat === 'groen' || resultaat === 'groen_re_entry'
 }
 
+// --- korte code voor handmatige invoer (PLAN §6, camera-fallback) ---
+// De volledige code {uuid}.{hmac} is te lang om aan de deur in te tikken. We
+// tonen daarom de laatste tekens (het staartje van de HMAC) als korte code op de
+// ticketpagina en in de admin. De scanner herleidt die tegen de gesyncte lijst
+// terug naar de volledige code, zodat de server-upload de HMAC blijft verifiëren.
+const KORT_CODE_LENGTE = 6
+
+export function kortCode(code: string): string {
+  return code.slice(-KORT_CODE_LENGTE).toUpperCase()
+}
+
+export type CodeHerleiding =
+  | { status: 'gevonden'; code: string }
+  | { status: 'geen' }
+  | { status: 'ambigu' }
+
+/**
+ * Zoekt de volledige code bij handmatige invoer: de korte code (staartje), of
+ * een geplakte volledige code. Matcht als de invoer het einde van precies één
+ * code in de lijst is. Meerdere treffers → ambigu (vraag om meer tekens).
+ */
+export function herleidCode(codes: string[], invoer: string): CodeHerleiding {
+  const norm = invoer.trim().toLowerCase()
+  if (!norm) return { status: 'geen' }
+  const treffers = codes.filter((c) => c.toLowerCase().endsWith(norm))
+  if (treffers.length === 1) return { status: 'gevonden', code: treffers[0] }
+  if (treffers.length > 1) return { status: 'ambigu' }
+  return { status: 'geen' }
+}
+
 /**
  * De lokale beslisregel (PLAN §3.3 stap 1–2). Membership-check: een code die
  * niet in de gesyncte lijst zit, is niet door ons uitgegeven → rood_ongeldig.
