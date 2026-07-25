@@ -1,33 +1,62 @@
 import { Link, createFileRoute, redirect } from '@tanstack/react-router'
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { getEvent } from '#/server/events'
 import { getCurrentUser } from '#/server/session'
-import { recordScan } from '#/server/scan'
-import type { ScanResultaat } from '#/server/scan'
+import { syncTickets, uploadScans } from '#/server/sync'
+import { bepaalLokaal, isGroen } from '#/lib/scanResult'
+import type { ScanUitkomst } from '#/lib/scanResult'
+import {
+  bewaarLijst,
+  laadLijst,
+  laadQueue,
+  markeerGebruikt,
+  voegToeAanQueue,
+  verwijderUitQueue,
+} from '#/lib/scannerStore'
+import type { Lijst } from '#/lib/scannerStore'
 import { decodeFrame } from '#/lib/qrscan'
 
-// Scannerscherm (fase D). Aparte volscherm-route, mobiel-first: dit draait aan
-// de deur op een telefoon. Camera leest de QR, het endpoint beslist groen/rood.
+// Scannerscherm (fase D + E). Aparte volscherm-route, mobiel-first: dit draait
+// aan de deur op een telefoon. Camera leest de QR; het oordeel valt lokaal
+// (offline-first, PLAN §3.3), de server krijgt de scan via een idempotente
+// uploadqueue.
 export const Route = createFileRoute('/scan/$eventId')({
   beforeLoad: async () => {
-    // Zelfde guard als /admin: geen sessie → naar /login. Token-toegang zonder
-    // account komt in fase F.
-    const user = await getCurrentUser()
+    // Zelfde guard als /admin: geen sessie → naar /login. Maar offline (koude
+    // start aan de deur) gooit getCurrentUser een netwerkfout — dan doorlaten en
+    // op de eerdere sessie vertrouwen. Alleen bij een écht "geen gebruiker"
+    // doorsturen. Token-toegang zonder account komt in fase F.
+    let user
+    try {
+      user = await getCurrentUser()
+    } catch {
+      return
+    }
     if (!user) throw redirect({ to: '/login' })
   },
-  loader: ({ params }) => getEvent({ data: params.eventId }),
+  loader: async ({ params }) => {
+    // Offline valt getEvent weg; de component leest de eventnaam dan uit de
+    // gesyncte lijst in localStorage.
+    try {
+      return await getEvent({ data: params.eventId })
+    } catch {
+      return null
+    }
+  },
   component: Scanner,
 })
+
+// Weiger te scannen als de lijst ouder is dan dit (PLAN risico's: ">2 uur oud").
+const MAX_SYNC_LEEFTIJD_MS = 2 * 60 * 60 * 1000
+// Volledige re-sync met de server (PLAN §3.4: scanners zien elkaars scans).
+const SYNC_INTERVAL_MS = 10_000
 
 // --- weergave per resultaat ---
 
 type Weergave = { groen: boolean; titel: string; subtitel?: string }
 
-function weergaveVoor(
-  resultaat: ScanResultaat,
-  gebruiktOp: string | null,
-): Weergave {
-  switch (resultaat) {
+function weergaveVoor(uitkomst: ScanUitkomst): Weergave {
+  switch (uitkomst.resultaat) {
     case 'groen':
       return { groen: true, titel: 'Welkom' }
     case 'groen_re_entry':
@@ -36,8 +65,8 @@ function weergaveVoor(
       return {
         groen: false,
         titel: 'Al gebruikt',
-        subtitel: gebruiktOp
-          ? `Gescand om ${new Date(gebruiktOp).toLocaleString('nl-NL')}`
+        subtitel: uitkomst.gebruikt_op
+          ? `Gescand om ${new Date(uitkomst.gebruikt_op).toLocaleString('nl-NL')}`
           : undefined,
       }
     case 'rood_ingetrokken':
@@ -82,6 +111,24 @@ function uitlegCamerafout(err: unknown): string {
   return 'Camera kon niet starten. Werkt dit scherm via https of localhost? Tik anders de code handmatig in.'
 }
 
+function leeftijdTekst(gesyncedOp: string | null): string {
+  if (!gesyncedOp) return 'nog niet gesynct'
+  const ms = Date.now() - new Date(gesyncedOp).getTime()
+  const min = Math.floor(ms / 60000)
+  if (min < 1) return 'zojuist'
+  if (min < 60) return `${min} min geleden`
+  const uur = Math.floor(min / 60)
+  return `${uur} uur geleden`
+}
+
+function nieuwUuid(): string {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+    return crypto.randomUUID()
+  }
+  // Fallback voor oude toestellen zonder crypto.randomUUID.
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`
+}
+
 function Scanner() {
   const event = Route.useLoaderData()
   const { eventId } = Route.useParams()
@@ -91,10 +138,74 @@ function Scanner() {
   const audioRef = useRef<AudioContext | null>(null)
   const pauzeRef = useRef(false)
   const laatsteCodeRef = useRef<string | null>(null)
+  const lijstRef = useRef<Lijst | null>(null)
+  const flushBezigRef = useRef(false)
 
   const [overlay, setOverlay] = useState<Weergave | null>(null)
   const [cameraFout, setCameraFout] = useState<string | null>(null)
   const [handmatig, setHandmatig] = useState('')
+  const [naam, setNaam] = useState<string>(event?.naam ?? '')
+  const [gesyncedOp, setGesyncedOp] = useState<string | null>(null)
+  const [online, setOnline] = useState(true)
+  const [queueAantal, setQueueAantal] = useState(0)
+  const [heeftLijst, setHeeftLijst] = useState(false)
+  // Ververst de "X min geleden"-tekst zonder een nieuwe sync te forceren.
+  const [, setTik] = useState(0)
+
+  const isVerouderd = gesyncedOp
+    ? Date.now() - new Date(gesyncedOp).getTime() > MAX_SYNC_LEEFTIJD_MS
+    : true
+
+  // --- uploadqueue legen ---
+  const flush = useCallback(async () => {
+    if (flushBezigRef.current) return
+    const queue = laadQueue(eventId)
+    if (queue.length === 0) return
+    flushBezigRef.current = true
+    try {
+      const res = await uploadScans({ data: { eventId, scans: queue } })
+      // De server geeft per verzonden scan een resultaat terug; die zijn nu
+      // verwerkt (idempotent) en mogen uit de queue.
+      const gedaan = res.resultaten.map((r) => r.client_scan_uuid)
+      verwijderUitQueue(eventId, gedaan)
+      setQueueAantal(laadQueue(eventId).length)
+      setOnline(true)
+    } catch {
+      // Mislukt (offline?): alles blijft in de queue, volgende poging pakt 't op.
+      setOnline(false)
+    } finally {
+      flushBezigRef.current = false
+    }
+  }, [eventId])
+
+  // --- volledige sync ---
+  const syncNu = useCallback(async () => {
+    try {
+      const data = await syncTickets({ data: eventId })
+      const l = bewaarLijst(eventId, {
+        gesyncedOp: data.gesyncedOp,
+        naam: data.naam,
+        reEntry: data.reEntry,
+        tickets: data.tickets,
+      })
+      lijstRef.current = l
+      setHeeftLijst(true)
+      setGesyncedOp(l.gesyncedOp)
+      setNaam(l.naam)
+      setOnline(true)
+      void flush()
+    } catch {
+      // Offline: val terug op de localStorage-back-up (PLAN §3.3).
+      setOnline(false)
+      const l = laadLijst(eventId)
+      if (l) {
+        lijstRef.current = l
+        setHeeftLijst(true)
+        setGesyncedOp(l.gesyncedOp)
+        setNaam(l.naam)
+      }
+    }
+  }, [eventId, flush])
 
   function toon(w: Weergave) {
     setOverlay(w)
@@ -114,62 +225,102 @@ function Scanner() {
     }, 1500)
   }
 
-  async function verwerk(code: string) {
+  // Lokaal oordeel + (bij groen) markeren en in de queue zetten (PLAN §3.3).
+  function verwerk(code: string) {
     pauzeRef.current = true
-    try {
-      const res = await recordScan({ data: { eventId, code } })
-      toon(weergaveVoor(res.resultaat, res.gebruikt_op))
-    } catch {
+    const lijst = lijstRef.current
+    if (!lijst) {
       toon({
         groen: false,
-        titel: 'Netwerkfout',
-        subtitel: 'Niet verstuurd — probeer opnieuw',
+        titel: 'Geen lijst',
+        subtitel: 'Wacht op de eerste sync met internet',
       })
+      return
+    }
+    const uitkomst = bepaalLokaal(lijst.tickets[code], lijst.reEntry)
+    toon(weergaveVoor(uitkomst))
+
+    if (isGroen(uitkomst.resultaat)) {
+      const nu = new Date().toISOString()
+      const bijgewerkt = markeerGebruikt(eventId, code, nu)
+      if (bijgewerkt) lijstRef.current = bijgewerkt
+      voegToeAanQueue(eventId, {
+        client_scan_uuid: nieuwUuid(),
+        code,
+        tijdstip_client: nu,
+        resultaat: uitkomst.resultaat,
+      })
+      setQueueAantal(laadQueue(eventId).length)
+      void flush()
     }
   }
 
-  async function handmatigVersturen(e: React.FormEvent) {
+  function handmatigVersturen(e: React.FormEvent) {
     e.preventDefault()
     const code = handmatig.trim()
-    if (!code || pauzeRef.current) return
+    if (!code || pauzeRef.current || isVerouderd) return
     setHandmatig('')
-    await verwerk(code)
+    verwerk(code)
   }
 
+  // Lijst + queue meteen uit localStorage (offline start), dan syncen en een
+  // interval opzetten. Plus reageren op online/offline en de tijd-tekst tikken.
+  useEffect(() => {
+    const l = laadLijst(eventId)
+    if (l) {
+      lijstRef.current = l
+      setHeeftLijst(true)
+      setGesyncedOp(l.gesyncedOp)
+      setNaam((prev) => prev || l.naam)
+    }
+    setQueueAantal(laadQueue(eventId).length)
+    if (typeof navigator !== 'undefined') setOnline(navigator.onLine)
+
+    void syncNu()
+    const syncTimer = window.setInterval(() => void syncNu(), SYNC_INTERVAL_MS)
+    const tikTimer = window.setInterval(() => setTik((n) => n + 1), 30_000)
+
+    const bijOnline = () => {
+      setOnline(true)
+      void syncNu()
+    }
+    const bijOffline = () => setOnline(false)
+    window.addEventListener('online', bijOnline)
+    window.addEventListener('offline', bijOffline)
+
+    return () => {
+      window.clearInterval(syncTimer)
+      window.clearInterval(tikTimer)
+      window.removeEventListener('online', bijOnline)
+      window.removeEventListener('offline', bijOffline)
+    }
+  }, [eventId, syncNu])
+
+  // Cameralus (fase D, ongewijzigd behalve dat verwerk nu lokaal beslist).
   useEffect(() => {
     const video = videoRef.current
     const canvas = canvasRef.current
     if (!video || !canvas) return
 
-    // Mutabel status-object i.p.v. losse `let`: de vlag wordt in de cleanup
-    // gezet, en zo ziet de type-checker hem niet als constant.
     const staat: { gestopt: boolean; stream: MediaStream | null } = {
       gestopt: false,
       stream: null,
     }
     let timer: number | undefined
 
-    // De vlaggen worden gemuteerd (cleanup, resultaat-timeout) terwijl de lus in
-    // een await hangt. Via accessors gelezen, zodat de type-checker ze niet als
-    // constant beschouwt en er echte runtime-checks van maakt.
     const isGestopt = () => staat.gestopt
     const isPauze = () => pauzeRef.current
 
-    // video/canvas als parameters: zo behouden ze hun non-null-type in deze
-    // geneste async-closures (narrowing lekt daar anders weg).
     async function lus(v: HTMLVideoElement, c: HTMLCanvasElement) {
       if (isGestopt()) return
-      // Niet scannen terwijl er een resultaat op het scherm staat.
       if (!isPauze()) {
         const code = await decodeFrame(v, c)
         if (isGestopt()) return
         if (!code) {
-          // Frame leeg: sta toe dat dezelfde QR straks opnieuw telt (weghalen
-          // en terugbrengen = bewuste herscan → checkpoint "nogmaals → rood").
           laatsteCodeRef.current = null
         } else if (code !== laatsteCodeRef.current && !isPauze()) {
           laatsteCodeRef.current = code
-          await verwerk(code)
+          verwerk(code)
         }
       }
       if (!isGestopt()) timer = window.setTimeout(() => void lus(v, c), 200)
@@ -205,8 +356,25 @@ function Scanner() {
     <div className="fixed inset-0 flex flex-col bg-black text-white">
       <header className="flex items-center justify-between px-4 py-3">
         <div className="min-w-0">
-          <div className="truncate text-sm font-semibold">{event.naam}</div>
-          <div className="text-xs text-white/60">Scannen</div>
+          <div className="truncate text-sm font-semibold">
+            {naam || 'Scanner'}
+          </div>
+          <div className="flex items-center gap-2 text-xs text-white/60">
+            <span
+              className={`inline-block h-2 w-2 rounded-full ${
+                online ? 'bg-green-400' : 'bg-yellow-400'
+              }`}
+            />
+            <span>{online ? 'Online' : 'Offline'}</span>
+            <span>·</span>
+            <span>Sync {leeftijdTekst(gesyncedOp)}</span>
+            {queueAantal > 0 && (
+              <>
+                <span>·</span>
+                <span>{queueAantal} te versturen</span>
+              </>
+            )}
+          </div>
         </div>
         <Link
           to="/admin/events/$eventId"
@@ -228,7 +396,7 @@ function Scanner() {
         <canvas ref={canvasRef} className="hidden" />
 
         {/* Richtkader */}
-        {!overlay && !cameraFout && (
+        {!overlay && !cameraFout && !isVerouderd && (
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
             <div className="h-56 w-56 rounded-2xl border-4 border-white/70" />
           </div>
@@ -251,6 +419,26 @@ function Scanner() {
           </div>
         )}
 
+        {/* Verouderde of ontbrekende lijst: weiger te scannen (PLAN risico's) */}
+        {!overlay && isVerouderd && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/85 p-6">
+            <div className="max-w-sm text-center">
+              <div className="mb-2 text-4xl">⚠️</div>
+              <p className="text-sm text-white/90">
+                {heeftLijst
+                  ? `De ticketlijst is ${leeftijdTekst(gesyncedOp)} gesynct. Verbind met internet en ververs voordat je scant.`
+                  : 'Nog geen ticketlijst. Verbind eerst met internet om te synchroniseren.'}
+              </p>
+              <button
+                onClick={() => void syncNu()}
+                className="mt-4 rounded bg-white px-4 py-2 text-sm font-medium text-black"
+              >
+                Opnieuw synchroniseren
+              </button>
+            </div>
+          </div>
+        )}
+
         {cameraFout && (
           <div className="absolute inset-0 flex items-center justify-center bg-black/80 p-6">
             <p className="max-w-sm text-center text-sm text-white/90">
@@ -269,11 +457,13 @@ function Scanner() {
           value={handmatig}
           onChange={(e) => setHandmatig(e.target.value)}
           placeholder="Code handmatig invoeren"
-          className="min-w-0 flex-1 rounded bg-white/10 px-3 py-2 text-sm placeholder:text-white/40"
+          disabled={isVerouderd}
+          className="min-w-0 flex-1 rounded bg-white/10 px-3 py-2 text-sm placeholder:text-white/40 disabled:opacity-40"
         />
         <button
           type="submit"
-          className="rounded bg-white px-4 py-2 text-sm font-medium text-black"
+          disabled={isVerouderd}
+          className="rounded bg-white px-4 py-2 text-sm font-medium text-black disabled:opacity-40"
         >
           Check
         </button>

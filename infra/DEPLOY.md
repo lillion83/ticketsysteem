@@ -99,6 +99,14 @@ npm run db:migrate
 npm run build
 ```
 
+> **Nooit `npm run build` los draaien op de VPS zonder er meteen een
+> `pm2 restart ticketsysteem` op te laten volgen.** De build overschrijft de
+> assets in `.output/public/assets/` met nieuwe hashes, maar de draaiende server
+> blijft HTML uitserveren die naar de óude hashes verwijst. Gevolg: bezoekers
+> krijgen `Failed to fetch dynamically imported module` (de oude chunk 404't) tot
+> de herstart. Wil je alleen verifiëren dat het bouwt? Doe dat op de laptop, niet
+> hier. Op de VPS horen build en restart altijd als paar te gaan.
+
 Eerste keer starten:
 
 ```bash

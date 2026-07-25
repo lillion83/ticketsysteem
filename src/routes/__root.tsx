@@ -1,4 +1,5 @@
 import { HeadContent, Scripts, createRootRoute } from '@tanstack/react-router'
+import { useEffect } from 'react'
 import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
 import { TanStackDevtools } from '@tanstack/react-devtools'
 
@@ -23,10 +24,28 @@ export const Route = createRootRoute({
         rel: 'stylesheet',
         href: appCss,
       },
+      {
+        rel: 'manifest',
+        href: '/manifest.webmanifest',
+      },
     ],
   }),
   shellComponent: RootDocument,
 })
+
+// Registreert de service worker (fase E, offline-first). Alleen in productie:
+// in dev zou de SW de assets van de dev-server cachen en verwarring geven.
+function ServiceWorkerRegistrar() {
+  useEffect(() => {
+    if (!import.meta.env.PROD) return
+    if (!('serviceWorker' in navigator)) return
+    navigator.serviceWorker.register('/sw.js').catch(() => {
+      // Registratie mislukt (bv. geen https): de app werkt gewoon door,
+      // alleen zonder offline-shell.
+    })
+  }, [])
+  return null
+}
 
 function RootDocument({ children }: { children: React.ReactNode }) {
   return (
@@ -36,6 +55,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       </head>
       <body>
         {children}
+        <ServiceWorkerRegistrar />
         <TanStackDevtools
           config={{
             position: 'bottom-right',
