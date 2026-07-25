@@ -33,7 +33,7 @@ Zelfde fundering als Webwinkri, om herbruik te maximaliseren:
 - **Database:** PostgreSQL + Drizzle ORM
 - **Auth:** Better Auth (organization plugin, ook al is er één org)
 - **Hosting:** VPS (InterServer), Caddy + PM2
-- **Mail:** Brevo (transactioneel, geen campagne)
+- **Mail:** Resend (transactioneel, geen campagne)
 - **Scanner:** PWA in dezelfde app, aparte route
 
 Bewuste keuze: alles in één codebase, één deploy. Geen aparte scanner-repo.

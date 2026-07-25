@@ -184,7 +184,7 @@ export const sendTicketMail = createServerFn({ method: 'POST' })
     if (!resultaat.verzonden) {
       // Niets verstuurd (geen API-key) → ook niet als geleverd markeren.
       throw new Error(
-        'Mail niet verstuurd: BREVO_API_KEY of BREVO_AFZENDER_EMAIL ontbreekt in .env',
+        'Mail niet verstuurd: MAIL_API_KEY of MAIL_AFZENDER_EMAIL ontbreekt in .env',
       )
     }
 

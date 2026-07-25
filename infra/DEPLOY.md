@@ -66,9 +66,9 @@ TICKET_SECRET=...
 BETTER_AUTH_SECRET=...
 BETTER_AUTH_URL=https://tickets.mijnonline.shop
 PUBLIC_BASE_URL=https://tickets.mijnonline.shop
-BREVO_API_KEY=...
-BREVO_AFZENDER_NAAM=Ticketsysteem
-BREVO_AFZENDER_EMAIL=...
+MAIL_API_KEY=re_...
+MAIL_AFZENDER_NAAM=Ticketsysteem
+MAIL_AFZENDER_EMAIL=tickets@mijnonline.shop
 PORT=3100
 ```
 
@@ -80,6 +80,21 @@ Let op:
   van bestaande tickets. Verandert hij, dan verifieert geen enkele bestaande
   QR-code meer.
 - `PORT=3100` — moet overeenkomen met de poort in het Caddy-siteblok.
+
+### 5. Mail: Resend
+
+Transactionele mail loopt via [Resend](https://resend.com) (geen SMS-verificatie
+nodig). Eenmalig:
+
+1. Resend-account aanmaken (e-mail of GitHub).
+2. Domein `mijnonline.shop` toevoegen in Resend → het geeft SPF/DKIM-records.
+   Die als DNS-records bij **Porkbun** toevoegen en op "verified" wachten.
+3. Een API-key aanmaken (begint met `re_`) en in `.env.local` als `MAIL_API_KEY`
+   zetten, met `MAIL_AFZENDER_EMAIL=tickets@mijnonline.shop`.
+
+Snel testen vóór de DNS rond is: zet tijdelijk
+`MAIL_AFZENDER_EMAIL=onboarding@resend.dev` — Resend levert daarmee zonder
+domeinverificatie af, maar alleen naar je eigen account-adres.
 
 ## Uitrollen (elke keer)
 
