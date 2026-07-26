@@ -22,6 +22,13 @@
       "when": 1785093847801,
       "tag": "0002_tearful_blackheart",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1785097796096,
+      "tag": "0003_warm_bloodstrike",
+      "breakpoints": true
     }
   ]
 }

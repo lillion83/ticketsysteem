@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { SiteFooter, SiteNav, SitePage, coverStyle, stripe } from '#/components/discovery/site'
-import { formatPrice, useCurrency } from '#/components/discovery/currency'
+import { formatMoney, useCurrency } from '#/components/discovery/currency'
 import { getPublicEvent } from '#/server/discovery'
 
 // Event-detailpagina (ontwerp: EventDetail.dc.html), gevoed door de database.
@@ -72,7 +72,7 @@ function EventDetailPage() {
             )}
 
             {detail.agenda.length > 0 && (
-              <Card last>
+              <Card>
                 <h2 className="mb-5 text-[22px] font-extrabold">Agenda</h2>
                 <div className="flex flex-col">
                   {detail.agenda.map((a, i) => {
@@ -107,6 +107,44 @@ function EventDetailPage() {
                       </div>
                     )
                   })}
+                </div>
+              </Card>
+            )}
+
+            {detail.tickets.length > 0 && (
+              <Card last>
+                <h2 className="mb-5 text-[22px] font-extrabold">Tickets</h2>
+                <div className="flex flex-col gap-4">
+                  {detail.tickets.map((t) => (
+                    <div key={t.id} className="rounded-[14px] border border-[#E5E7EB] p-[18px]">
+                      <div className="mb-2 flex items-start justify-between gap-4">
+                        <div className="text-[16px] font-extrabold">{t.naam}</div>
+                        <div className="whitespace-nowrap text-[16px] font-extrabold text-[#2563EB]">
+                          {formatMoney(t.prijsSrd, t.prijsUsd, currency)}
+                        </div>
+                      </div>
+                      {t.features.length > 0 && (
+                        <ul className="flex flex-col gap-1.5">
+                          {t.features.map((f, i) => (
+                            <li key={i} className="flex items-center gap-2 text-[13.5px] text-[#334155]">
+                              <svg
+                                width="14"
+                                height="14"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="#2563EB"
+                                strokeWidth="2.5"
+                                className="flex-none"
+                              >
+                                <path d="M20 6 9 17l-5-5" />
+                              </svg>
+                              {f}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  ))}
                 </div>
               </Card>
             )}
@@ -149,7 +187,9 @@ function EventDetailPage() {
               </div>
               <div className="mb-0.5 text-[13px] text-[#64748B]">Vanaf</div>
               <div className="mb-4 text-[22px] font-extrabold text-[#2563EB]">
-                {detail.prijsVanafSrd === null ? 'Gratis' : formatPrice(detail.prijsVanafSrd, currency)}
+                {detail.prijsVanafSrd === null
+                  ? 'Gratis'
+                  : formatMoney(detail.prijsVanafSrd, detail.prijsVanafUsd, currency)}
               </div>
               {/* Registreer Nu → wire aan het bestaande checkout-/ticketflow zodra
                   dat publiek beschikbaar is (nu nog placeholder). */}

@@ -564,8 +564,10 @@ type TypeInitial = {
   id: string
   naam: string
   prijs_srd: string
+  prijs_usd: string | null
   inkoopprijs_srd: string
   aantal_beschikbaar: string
+  features: Array<string> | null
 }
 
 function TypeForm({
@@ -579,8 +581,11 @@ function TypeForm({
 }) {
   const [naam, setNaam] = useState(initial?.naam ?? '')
   const [prijs, setPrijs] = useState(initial?.prijs_srd ?? '')
+  const [prijsUsd, setPrijsUsd] = useState(initial?.prijs_usd ?? '')
   const [inkoop, setInkoop] = useState(initial?.inkoopprijs_srd ?? '')
   const [aantal, setAantal] = useState(initial?.aantal_beschikbaar ?? '')
+  // Features: één per regel in de textarea.
+  const [features, setFeatures] = useState((initial?.features ?? []).join('\n'))
   const [fout, setFout] = useState<string | null>(null)
 
   async function opslaan(e: React.FormEvent) {
@@ -591,8 +596,10 @@ function TypeForm({
         event_id: eventId,
         naam,
         prijs_srd: prijs,
+        prijs_usd: prijsUsd,
         inkoopprijs_srd: inkoop,
         aantal_beschikbaar: aantal,
+        features: features.split('\n'),
       }
       if (initial) {
         await updateTicketType({ data: { ...payload, id: initial.id } })
@@ -606,50 +613,68 @@ function TypeForm({
   }
 
   return (
-    <form onSubmit={opslaan} className="grid grid-cols-5 items-end gap-2">
+    <form onSubmit={opslaan} className="flex flex-col gap-2">
+      <div className="grid grid-cols-2 items-end gap-2 sm:grid-cols-5">
+        <label className="flex flex-col gap-1">
+          <span className="text-xs font-medium">Naam</span>
+          <input
+            required
+            value={naam}
+            onChange={(e) => setNaam(e.target.value)}
+            className="rounded border border-gray-300 px-2 py-1"
+          />
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-xs font-medium">Prijs (SRD)</span>
+          <input
+            required
+            value={prijs}
+            onChange={(e) => setPrijs(e.target.value)}
+            className="rounded border border-gray-300 px-2 py-1"
+          />
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-xs font-medium">Prijs (USD)</span>
+          <input
+            value={prijsUsd}
+            onChange={(e) => setPrijsUsd(e.target.value)}
+            placeholder="optioneel"
+            className="rounded border border-gray-300 px-2 py-1"
+          />
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-xs font-medium">Inkoop (SRD)</span>
+          <input
+            required
+            value={inkoop}
+            onChange={(e) => setInkoop(e.target.value)}
+            className="rounded border border-gray-300 px-2 py-1"
+          />
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-xs font-medium">Beschikbaar</span>
+          <input
+            required
+            value={aantal}
+            onChange={(e) => setAantal(e.target.value)}
+            className="rounded border border-gray-300 px-2 py-1"
+          />
+        </label>
+      </div>
       <label className="flex flex-col gap-1">
-        <span className="text-xs font-medium">Naam</span>
-        <input
-          required
-          value={naam}
-          onChange={(e) => setNaam(e.target.value)}
+        <span className="text-xs font-medium">Kenmerken (één per regel)</span>
+        <textarea
+          value={features}
+          onChange={(e) => setFeatures(e.target.value)}
+          rows={3}
+          placeholder="Volledige toegang&#10;Toegang tot event-app"
           className="rounded border border-gray-300 px-2 py-1"
         />
       </label>
-      <label className="flex flex-col gap-1">
-        <span className="text-xs font-medium">Prijs</span>
-        <input
-          required
-          value={prijs}
-          onChange={(e) => setPrijs(e.target.value)}
-          className="rounded border border-gray-300 px-2 py-1"
-        />
-      </label>
-      <label className="flex flex-col gap-1">
-        <span className="text-xs font-medium">Inkoop</span>
-        <input
-          required
-          value={inkoop}
-          onChange={(e) => setInkoop(e.target.value)}
-          className="rounded border border-gray-300 px-2 py-1"
-        />
-      </label>
-      <label className="flex flex-col gap-1">
-        <span className="text-xs font-medium">Beschikbaar</span>
-        <input
-          required
-          value={aantal}
-          onChange={(e) => setAantal(e.target.value)}
-          className="rounded border border-gray-300 px-2 py-1"
-        />
-      </label>
-      <button
-        type="submit"
-        className="rounded bg-black px-3 py-1 text-sm font-medium text-white"
-      >
+      {fout && <p className="text-sm text-red-600">{fout}</p>}
+      <button type="submit" className="justify-self-start self-start rounded bg-black px-3 py-1 text-sm font-medium text-white">
         Opslaan
       </button>
-      {fout && <p className="col-span-5 text-sm text-red-600">{fout}</p>}
     </form>
   )
 }

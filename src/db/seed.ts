@@ -44,18 +44,22 @@ async function seed() {
       organization_id: organisatie.id,
       naam: 'Regulier',
       prijs_srd: '150.00',
+      prijs_usd: '4.00',
       inkoopprijs_srd: '100.00',
       aantal_beschikbaar: '150',
       aantal_verkocht: '42',
+      features: ['Volledige toegang tot alle sessies', 'Toegang tot event-app'],
     },
     {
       event_id: event.id,
       organization_id: organisatie.id,
       naam: 'VIP',
       prijs_srd: '350.00',
+      prijs_usd: '10.00',
       inkoopprijs_srd: '250.00',
       aantal_beschikbaar: '50',
       aantal_verkocht: '8',
+      features: ['Alles in Regulier', 'VIP-lounge toegang', 'Gereserveerde plaatsen'],
     },
   ])
 

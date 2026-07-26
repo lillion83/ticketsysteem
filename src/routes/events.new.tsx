@@ -132,7 +132,9 @@ function OrganiseerEvent() {
       tiers: tiers.map((t) => ({
         naam: t.name,
         prijs_srd: String(t.priceSRD),
+        prijs_usd: t.priceUSD ? String(t.priceUSD) : null,
         aantal_beschikbaar: String(t.qty),
+        features: t.features,
       })),
       sprekers: lineup.map((l) => ({ naam: l.name, rol: l.role })),
     }

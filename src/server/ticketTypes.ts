@@ -34,8 +34,10 @@ export type TicketTypeInput = {
   event_id: string
   naam: string
   prijs_srd: string
+  prijs_usd: string
   inkoopprijs_srd: string
   aantal_beschikbaar: string
+  features: Array<string>
 }
 
 function parseTicketTypeInput(data: TicketTypeInput): TicketTypeInput {
@@ -49,7 +51,16 @@ function parseTicketTypeInput(data: TicketTypeInput): TicketTypeInput {
       throw new Error(`Ongeldige waarde voor ${veld}`)
     }
   }
+  // USD-prijs is optioneel (leeg = geen), maar als hij er is moet hij geldig zijn.
+  if (data.prijs_usd !== '' && (Number.isNaN(Number(data.prijs_usd)) || Number(data.prijs_usd) < 0)) {
+    throw new Error('Ongeldige USD-prijs')
+  }
   return data
+}
+
+// Normaliseert de features tot een schone string-array.
+function cleanFeatures(features: Array<string>): Array<string> {
+  return features.map((f) => f.trim()).filter(Boolean)
 }
 
 export const createTicketType = createServerFn({ method: 'POST' })
@@ -64,8 +75,10 @@ export const createTicketType = createServerFn({ method: 'POST' })
         organization_id: organizationId,
         naam: data.naam.trim(),
         prijs_srd: data.prijs_srd,
+        prijs_usd: data.prijs_usd.trim() || null,
         inkoopprijs_srd: data.inkoopprijs_srd,
         aantal_beschikbaar: data.aantal_beschikbaar,
+        features: cleanFeatures(data.features),
       })
       .returning()
     return type
@@ -84,8 +97,10 @@ export const updateTicketType = createServerFn({ method: 'POST' })
       .set({
         naam: data.naam.trim(),
         prijs_srd: data.prijs_srd,
+        prijs_usd: data.prijs_usd.trim() || null,
         inkoopprijs_srd: data.inkoopprijs_srd,
         aantal_beschikbaar: data.aantal_beschikbaar,
+        features: cleanFeatures(data.features),
       })
       .where(
         and(

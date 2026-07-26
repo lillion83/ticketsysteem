@@ -26,17 +26,25 @@ export type PublicEventCard = {
   dateLine: string
   locatie: string | null
   prijsVanafSrd: number | null
+  prijsVanafUsd: number | null
   aanmeldingen: number
 }
 
-// Aggregatie van ticket_types per event: laagste prijs ("vanaf") en totaal
-// verkocht (aanmeldingen). In JS omdat de lijst klein blijft (< 200 events).
-function aggregateTypes(rows: Array<{ event_id: string; prijs_srd: string; aantal_verkocht: string }>) {
-  const perEvent = new Map<string, { minPrijs: number | null; verkocht: number }>()
+// Aggregatie van ticket_types per event: laagste prijs ("vanaf", in SRD én
+// expliciete USD) en totaal verkocht (aanmeldingen). In JS omdat de lijst klein
+// blijft (< 200 events).
+function aggregateTypes(
+  rows: Array<{ event_id: string; prijs_srd: string; prijs_usd: string | null; aantal_verkocht: string }>,
+) {
+  const perEvent = new Map<string, { minSrd: number | null; minUsd: number | null; verkocht: number }>()
   for (const r of rows) {
-    const huidig = perEvent.get(r.event_id) ?? { minPrijs: null, verkocht: 0 }
-    const prijs = Number(r.prijs_srd)
-    huidig.minPrijs = huidig.minPrijs === null ? prijs : Math.min(huidig.minPrijs, prijs)
+    const huidig = perEvent.get(r.event_id) ?? { minSrd: null, minUsd: null, verkocht: 0 }
+    const srd = Number(r.prijs_srd)
+    huidig.minSrd = huidig.minSrd === null ? srd : Math.min(huidig.minSrd, srd)
+    if (r.prijs_usd !== null) {
+      const usd = Number(r.prijs_usd)
+      huidig.minUsd = huidig.minUsd === null ? usd : Math.min(huidig.minUsd, usd)
+    }
     huidig.verkocht += Number(r.aantal_verkocht)
     perEvent.set(r.event_id, huidig)
   }
@@ -56,6 +64,7 @@ export const listPublicEvents = createServerFn({ method: 'GET' }).handler(async 
         .select({
           event_id: ticketTypes.event_id,
           prijs_srd: ticketTypes.prijs_srd,
+          prijs_usd: ticketTypes.prijs_usd,
           aantal_verkocht: ticketTypes.aantal_verkocht,
         })
         .from(ticketTypes)
@@ -72,7 +81,8 @@ export const listPublicEvents = createServerFn({ method: 'GET' }).handler(async 
       titel: e.naam,
       dateLine: formatDateLine(e.datum_start),
       locatie: e.locatie,
-      prijsVanafSrd: a?.minPrijs ?? null,
+      prijsVanafSrd: a?.minSrd ?? null,
+      prijsVanafUsd: a?.minUsd ?? null,
       aanmeldingen: a?.verkocht ?? 0,
     }
   })
@@ -88,11 +98,19 @@ export type PublicEventDetail = {
   categorie: string | null
   organisator: string
   prijsVanafSrd: number | null
+  prijsVanafUsd: number | null
   paragrafen: Array<string>
   sprekers: Array<{ id: string; naam: string; rol: string | null; avatarUrl: string | null }>
   agenda: Array<{ id: string; tijd: string; titel: string; subtitel: string | null; beschrijving: string | null }>
   faqs: Array<{ id: string; vraag: string; antwoord: string | null }>
-  tickets: Array<{ id: string; naam: string; prijsSrd: number; aantalBeschikbaar: number }>
+  tickets: Array<{
+    id: string
+    naam: string
+    prijsSrd: number
+    prijsUsd: number | null
+    aantalBeschikbaar: number
+    features: Array<string>
+  }>
 }
 
 export const getPublicEvent = createServerFn({ method: 'GET' })
@@ -124,8 +142,10 @@ export const getPublicEvent = createServerFn({ method: 'GET' })
       db.select().from(eventFaq).where(eq(eventFaq.event_id, eventId)).orderBy(asc(eventFaq.volgorde)),
     ])
 
-    const prijzen = typeRows.map((t) => Number(t.prijs_srd))
-    const prijsVanafSrd = prijzen.length ? Math.min(...prijzen) : null
+    const prijzenSrd = typeRows.map((t) => Number(t.prijs_srd))
+    const prijsVanafSrd = prijzenSrd.length ? Math.min(...prijzenSrd) : null
+    const prijzenUsd = typeRows.filter((t) => t.prijs_usd !== null).map((t) => Number(t.prijs_usd))
+    const prijsVanafUsd = prijzenUsd.length ? Math.min(...prijzenUsd) : null
 
     return {
       id: e.id,
@@ -137,6 +157,7 @@ export const getPublicEvent = createServerFn({ method: 'GET' })
       categorie: e.categorie,
       organisator: e.organisator,
       prijsVanafSrd,
+      prijsVanafUsd,
       paragrafen: (e.beschrijving ?? '')
         .split(/\n{2,}/)
         .map((p) => p.trim())
@@ -154,7 +175,9 @@ export const getPublicEvent = createServerFn({ method: 'GET' })
         id: t.id,
         naam: t.naam,
         prijsSrd: Number(t.prijs_srd),
+        prijsUsd: t.prijs_usd !== null ? Number(t.prijs_usd) : null,
         aantalBeschikbaar: Number(t.aantal_beschikbaar),
+        features: t.features ?? [],
       })),
     }
   })

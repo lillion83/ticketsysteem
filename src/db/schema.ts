@@ -161,12 +161,17 @@ export const ticketTypes = pgTable(
       .references(() => organizations.id),
     naam: text('naam').notNull(),
     prijs_srd: numeric('prijs_srd', { precision: 12, scale: 2 }).notNull(),
+    // Optionele expliciete USD-prijs (publieke discovery). Los van de
+    // SRD→USD-omrekening: is deze gezet, dan wint hij bij USD-weergave.
+    prijs_usd: numeric('prijs_usd', { precision: 12, scale: 2 }),
     inkoopprijs_srd: numeric('inkoopprijs_srd', {
       precision: 12,
       scale: 2,
     }).notNull(),
     aantal_beschikbaar: numeric('aantal_beschikbaar').notNull(),
     aantal_verkocht: numeric('aantal_verkocht').notNull().default('0'),
+    // Kenmerken die bij dit ticket horen (publieke discovery).
+    features: text('features').array(),
   },
   (t) => [
     index('ticket_types_organization_id_idx').on(t.organization_id),

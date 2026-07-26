@@ -46,3 +46,14 @@ export function formatPrice(bedragSrd: number, valuta: Currency): string {
   }
   return `SRD ${bedragSrd.toLocaleString('nl-NL')}`
 }
+
+/**
+ * Formatteert een prijs met een optionele expliciete USD-waarde. Bij USD-weergave
+ * wint de opgegeven `bedragUsd` als die er is; anders rekenen we om vanaf SRD.
+ */
+export function formatMoney(bedragSrd: number, bedragUsd: number | null, valuta: Currency): string {
+  if (valuta === 'USD' && bedragUsd !== null) {
+    return `$${bedragUsd.toLocaleString('en-US')}`
+  }
+  return formatPrice(bedragSrd, valuta)
+}
