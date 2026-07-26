@@ -1,7 +1,10 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
+import { useState } from 'react'
 import { SiteFooter, SiteNav, SitePage, coverStyle, stripe } from '#/components/discovery/site'
 import { formatPrice, useCurrency } from '#/components/discovery/currency'
 import { getPublicEvent } from '#/server/discovery'
+import type { PublicEventDetail } from '#/server/discovery'
+import { createReservering } from '#/server/reserveringen'
 
 // Event-detailpagina (ontwerp: EventDetail.dc.html), gevoed door de database.
 export const Route = createFileRoute('/events/$eventId')({
@@ -20,10 +23,14 @@ const agendaAccenten: Array<[string, string]> = [
 function EventDetailPage() {
   const detail = Route.useLoaderData()
   const currency = useCurrency()
+  const [reserveerOpen, setReserveerOpen] = useState(false)
 
   return (
     <SitePage>
       <SiteNav active="events" />
+      {reserveerOpen && (
+        <ReserveerModal eventId={detail.id} titel={detail.titel} tickets={detail.tickets} onClose={() => setReserveerOpen(false)} />
+      )}
 
       <div className="mx-auto max-w-[1280px] px-6 pb-20 pt-8 md:px-12">
         {/* Hero */}
@@ -189,14 +196,14 @@ function EventDetailPage() {
               <div className="mb-4 text-[22px] font-extrabold text-[#2563EB]">
                 {detail.prijsVanafSrd === null ? 'Gratis' : formatPrice(detail.prijsVanafSrd, currency)}
               </div>
-              {/* Registreer Nu → wire aan het bestaande checkout-/ticketflow zodra
-                  dat publiek beschikbaar is (nu nog placeholder). */}
-              <a
-                href="#registreer"
-                className="mb-3 block rounded-full bg-[#2563EB] py-3.5 text-center text-[15px] font-bold text-white hover:bg-[#1D4ED8]"
+              {/* Registreer Nu → opent het reserveringsformulier (fase G). De
+                  organisator verwerkt de aanvraag in de admin tot een echt ticket. */}
+              <button
+                onClick={() => setReserveerOpen(true)}
+                className="mb-3 block w-full rounded-full bg-[#2563EB] py-3.5 text-center text-[15px] font-bold text-white hover:bg-[#1D4ED8]"
               >
                 Registreer Nu →
-              </a>
+              </button>
               <div className="flex gap-2.5">
                 <RailButton>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0F172A" strokeWidth="2">
@@ -291,5 +298,180 @@ function RailButton({ children }: { children: React.ReactNode }) {
     <button className="flex flex-1 items-center justify-center gap-1.5 rounded-full border border-[#E5E7EB] py-3 text-[13.5px] font-bold hover:bg-[#F1F5F9]">
       {children}
     </button>
+  )
+}
+
+// Reserveringsformulier (fase G). Verstuurt een publieke aanvraag; de organisator
+// verwerkt die in de admin tot een echt ticket.
+function ReserveerModal({
+  eventId,
+  titel,
+  tickets,
+  onClose,
+}: {
+  eventId: string
+  titel: string
+  tickets: PublicEventDetail['tickets']
+  onClose: () => void
+}) {
+  const [ticketTypeId, setTicketTypeId] = useState(tickets[0]?.id ?? '')
+  const [naam, setNaam] = useState('')
+  const [email, setEmail] = useState('')
+  const [telefoon, setTelefoon] = useState('')
+  const [aantal, setAantal] = useState(1)
+  const [opmerking, setOpmerking] = useState('')
+  const [bezig, setBezig] = useState(false)
+  const [fout, setFout] = useState<string | null>(null)
+  const [klaar, setKlaar] = useState(false)
+
+  async function verstuur(e: React.FormEvent) {
+    e.preventDefault()
+    setFout(null)
+    setBezig(true)
+    try {
+      await createReservering({
+        data: {
+          event_id: eventId,
+          ticket_type_id: ticketTypeId,
+          naam,
+          email: email || null,
+          telefoon: telefoon || null,
+          aantal,
+          opmerking: opmerking || null,
+        },
+      })
+      setKlaar(true)
+    } catch (err) {
+      setFout(err instanceof Error ? err.message : 'Reserveren mislukt')
+    } finally {
+      setBezig(false)
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      onClick={onClose}
+      role="presentation"
+    >
+      <div
+        className="w-full max-w-[440px] rounded-[18px] bg-white p-6 shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+      >
+        {klaar ? (
+          <div className="text-center">
+            <div className="mb-3 text-[40px]">🎫</div>
+            <h3 className="mb-2 text-[20px] font-extrabold">Reservering ontvangen</h3>
+            <p className="mb-6 text-[14px] text-[#64748B]">
+              Bedankt! De organisator neemt contact op om je ticket voor <strong>{titel}</strong> te bevestigen en te
+              leveren.
+            </p>
+            <button
+              onClick={onClose}
+              className="rounded-full bg-[#2563EB] px-6 py-3 text-[14px] font-bold text-white hover:bg-[#1D4ED8]"
+            >
+              Sluiten
+            </button>
+          </div>
+        ) : (
+          <>
+            <div className="mb-4 flex items-start justify-between">
+              <h3 className="text-[20px] font-extrabold">Reserveer je ticket</h3>
+              <button onClick={onClose} className="text-[#94A3B8] hover:text-[#0F172A]" aria-label="Sluiten">
+                ✕
+              </button>
+            </div>
+            {tickets.length === 0 ? (
+              <p className="text-[14px] text-[#64748B]">Voor dit event zijn nog geen tickettypes beschikbaar.</p>
+            ) : (
+              <form onSubmit={verstuur} className="flex flex-col gap-3.5">
+                <Veld label="Tickettype">
+                  <select
+                    value={ticketTypeId}
+                    onChange={(e) => setTicketTypeId(e.target.value)}
+                    className="w-full rounded-[10px] border border-[#E5E7EB] bg-[#F8FAFC] px-3.5 py-2.5 text-[14px]"
+                  >
+                    {tickets.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.naam}
+                      </option>
+                    ))}
+                  </select>
+                </Veld>
+                <Veld label="Aantal">
+                  <input
+                    type="number"
+                    min={1}
+                    max={10}
+                    value={aantal}
+                    onChange={(e) => setAantal(Number(e.target.value))}
+                    className="w-full rounded-[10px] border border-[#E5E7EB] bg-[#F8FAFC] px-3.5 py-2.5 text-[14px]"
+                  />
+                </Veld>
+                <Veld label="Naam">
+                  <ReserveerInput value={naam} onChange={setNaam} required />
+                </Veld>
+                <Veld label="E-mail">
+                  <ReserveerInput value={email} onChange={setEmail} type="email" />
+                </Veld>
+                <Veld label="Telefoon">
+                  <ReserveerInput value={telefoon} onChange={setTelefoon} type="tel" />
+                </Veld>
+                <p className="-mt-1 text-[12px] text-[#94A3B8]">Vul minstens een e-mailadres óf telefoonnummer in.</p>
+                <Veld label="Opmerking (optioneel)">
+                  <textarea
+                    value={opmerking}
+                    onChange={(e) => setOpmerking(e.target.value)}
+                    rows={2}
+                    className="w-full resize-y rounded-[10px] border border-[#E5E7EB] bg-[#F8FAFC] px-3.5 py-2.5 text-[14px] outline-none focus:border-[#2563EB]"
+                  />
+                </Veld>
+                {fout && <p className="text-[13px] font-semibold text-[#EF4444]">{fout}</p>}
+                <button
+                  type="submit"
+                  disabled={bezig}
+                  className="mt-1 rounded-full bg-[#2563EB] py-3 text-[15px] font-bold text-white hover:bg-[#1D4ED8] disabled:opacity-50"
+                >
+                  {bezig ? 'Bezig…' : 'Reservering versturen'}
+                </button>
+              </form>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function Veld({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="flex flex-col gap-1">
+      <span className="text-[13px] font-bold">{label}</span>
+      {children}
+    </label>
+  )
+}
+
+function ReserveerInput({
+  value,
+  onChange,
+  type = 'text',
+  required,
+}: {
+  value: string
+  onChange: (v: string) => void
+  type?: string
+  required?: boolean
+}) {
+  return (
+    <input
+      type={type}
+      required={required}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className="w-full rounded-[10px] border border-[#E5E7EB] bg-[#F8FAFC] px-3.5 py-2.5 text-[14px] outline-none focus:border-[#2563EB]"
+    />
   )
 }

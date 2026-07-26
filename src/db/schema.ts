@@ -20,6 +20,14 @@ export const scanResultaat = pgEnum('scan_resultaat', [
   'groen_re_entry',
 ])
 
+// Status van een publieke reservering (fase G): nieuw = nog te verwerken,
+// afgehandeld = ticket uitgegeven, afgewezen = niet gehonoreerd.
+export const reserveringStatus = pgEnum('reservering_status', [
+  'nieuw',
+  'afgehandeld',
+  'afgewezen',
+])
+
 // Vaste categorie-taxonomie voor de publieke discovery-front-end. Spiegelt de
 // categorieën uit het ontwerp; UI-labels blijven Nederlands.
 export const eventCategorie = pgEnum('event_categorie', [
@@ -242,6 +250,39 @@ export const eventFaq = pgTable(
   (t) => [
     index('event_faq_organization_id_idx').on(t.organization_id),
     index('event_faq_event_id_idx').on(t.event_id),
+  ],
+)
+
+// Publieke reserveringen (fase G): een bezoeker vraagt een ticket aan zonder
+// account of betaling. De organisator verwerkt het handmatig tot een echt ticket
+// via de bestaande uitgifte. organization_id staat erop (harde regel 3).
+export const reserveringen = pgTable(
+  'reserveringen',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    event_id: uuid('event_id')
+      .notNull()
+      .references(() => events.id),
+    ticket_type_id: uuid('ticket_type_id')
+      .notNull()
+      .references(() => ticketTypes.id),
+    organization_id: uuid('organization_id')
+      .notNull()
+      .references(() => organizations.id),
+    naam: text('naam').notNull(),
+    email: text('email'),
+    telefoon: text('telefoon'),
+    aantal: numeric('aantal').notNull().default('1'),
+    opmerking: text('opmerking'),
+    status: reserveringStatus('status').notNull().default('nieuw'),
+    aangemaakt_op: timestamp('aangemaakt_op', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    afgehandeld_op: timestamp('afgehandeld_op', { withTimezone: true }),
+  },
+  (t) => [
+    index('reserveringen_organization_id_idx').on(t.organization_id),
+    index('reserveringen_event_id_idx').on(t.event_id),
   ],
 )
 

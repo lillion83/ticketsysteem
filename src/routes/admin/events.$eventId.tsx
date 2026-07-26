@@ -23,6 +23,11 @@ import {
   listFaq,
   listSprekers,
 } from '#/server/eventContent'
+import {
+  afwijzenReservering,
+  listReserveringen,
+  verwerkReservering,
+} from '#/server/reserveringen'
 import { eventCategories } from '#/components/discovery/data'
 import { ticketBericht, whatsappLink } from '#/lib/whatsapp'
 import { kortCode } from '#/lib/scanResult'
@@ -31,7 +36,7 @@ type Categorie = (typeof eventCategories)[number]
 
 export const Route = createFileRoute('/admin/events/$eventId')({
   loader: async ({ params }) => {
-    const [event, types, tickets, baseUrl, sprekers, agenda, faq] = await Promise.all([
+    const [event, types, tickets, baseUrl, sprekers, agenda, faq, reserveringen] = await Promise.all([
       getEvent({ data: params.eventId }),
       listTicketTypes({ data: params.eventId }),
       listTickets({ data: { eventId: params.eventId } }),
@@ -39,8 +44,9 @@ export const Route = createFileRoute('/admin/events/$eventId')({
       listSprekers({ data: params.eventId }),
       listAgenda({ data: params.eventId }),
       listFaq({ data: params.eventId }),
+      listReserveringen({ data: params.eventId }),
     ])
-    return { event, types, tickets, baseUrl, sprekers, agenda, faq }
+    return { event, types, tickets, baseUrl, sprekers, agenda, faq, reserveringen }
   },
   component: EventDetail,
 })
@@ -60,6 +66,7 @@ function EventDetail() {
   return (
     <div className="flex flex-col gap-8">
       <EventSectie />
+      <ReserveringenSectie />
       <TicketTypesSectie />
       <SprekersSectie />
       <AgendaSectie />
@@ -464,6 +471,91 @@ function FaqSectie() {
         </button>
       </form>
     </ContentSectie>
+  )
+}
+
+function ReserveringenSectie() {
+  const { reserveringen } = Route.useLoaderData()
+  const router = useRouter()
+  const [fout, setFout] = useState<string | null>(null)
+  const [bezigId, setBezigId] = useState<string | null>(null)
+
+  const open = reserveringen.filter((r) => r.status === 'nieuw')
+  const afgehandeld = reserveringen.filter((r) => r.status !== 'nieuw')
+
+  async function actie(id: string, fn: () => Promise<unknown>) {
+    setFout(null)
+    setBezigId(id)
+    try {
+      await fn()
+      router.invalidate()
+    } catch (err) {
+      setFout(err instanceof Error ? err.message : 'Actie mislukt')
+    } finally {
+      setBezigId(null)
+    }
+  }
+
+  return (
+    <section>
+      <h2 className="mb-3 text-lg font-semibold">
+        Reserveringen{open.length > 0 && <span className="ml-2 rounded-full bg-blue-600 px-2 py-0.5 text-xs text-white">{open.length} nieuw</span>}
+      </h2>
+      {fout && <p className="mb-2 text-sm text-red-600">{fout}</p>}
+      {reserveringen.length === 0 ? (
+        <p className="text-sm text-gray-500">Nog geen reserveringen.</p>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {open.map((r) => (
+            <div
+              key={r.id}
+              className="flex flex-col gap-2 rounded border border-gray-200 p-3 sm:flex-row sm:items-center sm:justify-between"
+            >
+              <div className="text-sm">
+                <div className="font-medium">
+                  {r.naam} · {r.aantal}× {r.type_naam}
+                </div>
+                <div className="text-gray-500">
+                  {[r.email, r.telefoon].filter(Boolean).join(' · ') || 'geen contactgegevens'}
+                  {r.opmerking ? ` — "${r.opmerking}"` : ''}
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  disabled={bezigId === r.id}
+                  onClick={() => actie(r.id, () => verwerkReservering({ data: r.id }))}
+                  className="rounded bg-black px-3 py-1 text-sm font-medium text-white disabled:opacity-50"
+                >
+                  {bezigId === r.id ? 'Bezig…' : 'Ticket uitgeven'}
+                </button>
+                <button
+                  disabled={bezigId === r.id}
+                  onClick={() => actie(r.id, () => afwijzenReservering({ data: r.id }))}
+                  className="rounded border border-gray-300 px-3 py-1 text-sm hover:bg-gray-50 disabled:opacity-50"
+                >
+                  Afwijzen
+                </button>
+              </div>
+            </div>
+          ))}
+          {afgehandeld.length > 0 && (
+            <details className="mt-1 text-sm">
+              <summary className="cursor-pointer text-gray-500">Afgehandeld ({afgehandeld.length})</summary>
+              <div className="mt-2 flex flex-col gap-1">
+                {afgehandeld.map((r) => (
+                  <div key={r.id} className="flex justify-between rounded border border-gray-100 px-3 py-2 text-gray-600">
+                    <span>
+                      {r.naam} · {r.aantal}× {r.type_naam}
+                    </span>
+                    <span className={r.status === 'afgehandeld' ? 'text-green-600' : 'text-gray-400'}>{r.status}</span>
+                  </div>
+                ))}
+              </div>
+            </details>
+          )}
+        </div>
+      )}
+    </section>
   )
 }
 
