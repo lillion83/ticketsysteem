@@ -1,5 +1,6 @@
 import type { CSSProperties, ReactNode } from 'react'
 import { Link } from '@tanstack/react-router'
+import { setCurrency, useCurrency } from './currency'
 
 // Publieke discovery-front-end (homepage, events, detail, organiseren).
 // Los van het admin/scanner-deel: geen login, geen organization-scope — dit is
@@ -11,6 +12,24 @@ export function stripe(a: string, b: string): CSSProperties {
   return {
     backgroundImage: `repeating-linear-gradient(45deg,${a},${a} 10px,${b} 10px,${b} 20px)`,
   }
+}
+
+// Placeholder-achtergrond per categorie, gebruikt zolang een event geen echte
+// cover-afbeelding heeft. Neemt `cover` (url) als die er wel is.
+const categoryColors: Record<string, [string, string]> = {
+  Muziek: ['#FFF7ED', '#FFEDD5'],
+  Tech: ['#EFF6FF', '#DBEAFE'],
+  Business: ['#F0FDF4', '#DCFCE7'],
+  'Art & Design': ['#FDF4FF', '#FAE8FF'],
+  Health: ['#FEF2F2', '#FEE2E2'],
+  Sports: ['#F0FDFA', '#CCFBF1'],
+  'Food & Drink': ['#FFFBEB', '#FEF3C7'],
+}
+
+export function coverStyle(categorie: string | null, cover?: string | null): CSSProperties {
+  if (cover) return { backgroundImage: `url(${cover})`, backgroundSize: 'cover', backgroundPosition: 'center' }
+  const [a, b] = categoryColors[categorie ?? ''] ?? ['#F1F5F9', '#E2E8F0']
+  return stripe(a, b)
 }
 
 // ── Iconen (outline-stijl, zoals het ontwerp; geen icon-library) ────────────
@@ -99,9 +118,10 @@ export function SiteNav({ active }: { active?: NavKey }) {
         ))}
       </div>
       <div className="flex items-center gap-3.5">
+        <CurrencyToggle />
         <Link
           to="/events/new"
-          className="rounded-full bg-[#2563EB] px-5 py-2.5 text-[14px] font-bold text-white hover:bg-[#1D4ED8]"
+          className="hidden rounded-full bg-[#2563EB] px-5 py-2.5 text-[14px] font-bold text-white hover:bg-[#1D4ED8] sm:inline-block"
         >
           + Organiseer een Event
         </Link>
@@ -116,6 +136,28 @@ export function SiteNav({ active }: { active?: NavKey }) {
         </div>
       </div>
     </nav>
+  )
+}
+
+// SRD/USD-schakelaar in de header. SRD is de opgeslagen valuta; USD is een
+// weergave-omrekening (zie ./currency).
+function CurrencyToggle() {
+  const currency = useCurrency()
+  return (
+    <div className="flex items-center rounded-full border border-[#E5E7EB] p-0.5 text-[12px] font-bold">
+      {(['SRD', 'USD'] as const).map((c) => (
+        <button
+          key={c}
+          onClick={() => setCurrency(c)}
+          aria-pressed={currency === c}
+          className={`rounded-full px-2.5 py-1 transition ${
+            currency === c ? 'bg-[#2563EB] text-white' : 'text-[#64748B] hover:text-[#0F172A]'
+          }`}
+        >
+          {c}
+        </button>
+      ))}
+    </div>
   )
 }
 

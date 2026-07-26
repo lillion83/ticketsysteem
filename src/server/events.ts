@@ -1,8 +1,10 @@
 import { createServerFn } from '@tanstack/react-start'
 import { and, desc, eq } from 'drizzle-orm'
 import { db } from '#/db/index'
-import { events } from '#/db/schema'
+import { eventCategorie, events } from '#/db/schema'
 import { requireAuth } from '#/server/session'
+
+type Categorie = (typeof eventCategorie.enumValues)[number]
 
 // Alle functies scopen op organization_id uit de sessie (harde regel 3).
 
@@ -37,6 +39,10 @@ export type EventInput = {
   locatie: string | null
   re_entry_toegestaan: boolean
   status: string
+  // Publieke discovery-velden (optioneel).
+  categorie: Categorie | null
+  beschrijving: string | null
+  cover_afbeelding_url: string | null
 }
 
 function parseEventInput(data: EventInput): EventInput {
@@ -46,6 +52,9 @@ function parseEventInput(data: EventInput): EventInput {
   }
   if (new Date(data.datum_eind) < new Date(data.datum_start)) {
     throw new Error('Einddatum ligt vóór de startdatum')
+  }
+  if (data.categorie !== null && !eventCategorie.enumValues.includes(data.categorie)) {
+    throw new Error('Ongeldige categorie')
   }
   return data
 }
@@ -64,6 +73,9 @@ export const createEvent = createServerFn({ method: 'POST' })
         locatie: data.locatie?.trim() || null,
         re_entry_toegestaan: data.re_entry_toegestaan,
         status: data.status,
+        categorie: data.categorie,
+        beschrijving: data.beschrijving?.trim() || null,
+        cover_afbeelding_url: data.cover_afbeelding_url?.trim() || null,
       })
       .returning()
     return event
@@ -86,6 +98,9 @@ export const updateEvent = createServerFn({ method: 'POST' })
         locatie: data.locatie?.trim() || null,
         re_entry_toegestaan: data.re_entry_toegestaan,
         status: data.status,
+        categorie: data.categorie,
+        beschrijving: data.beschrijving?.trim() || null,
+        cover_afbeelding_url: data.cover_afbeelding_url?.trim() || null,
       })
       .where(
         and(eq(events.id, data.id), eq(events.organization_id, organizationId)),

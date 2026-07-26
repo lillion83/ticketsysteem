@@ -12,18 +12,35 @@ import {
   markDelivered,
   sendTicketMail,
 } from '#/server/delivery'
+import {
+  createAgenda,
+  createFaq,
+  createSpreker,
+  deleteAgenda,
+  deleteFaq,
+  deleteSpreker,
+  listAgenda,
+  listFaq,
+  listSprekers,
+} from '#/server/eventContent'
+import { eventCategories } from '#/components/discovery/data'
 import { ticketBericht, whatsappLink } from '#/lib/whatsapp'
 import { kortCode } from '#/lib/scanResult'
 
+type Categorie = (typeof eventCategories)[number]
+
 export const Route = createFileRoute('/admin/events/$eventId')({
   loader: async ({ params }) => {
-    const [event, types, tickets, baseUrl] = await Promise.all([
+    const [event, types, tickets, baseUrl, sprekers, agenda, faq] = await Promise.all([
       getEvent({ data: params.eventId }),
       listTicketTypes({ data: params.eventId }),
       listTickets({ data: { eventId: params.eventId } }),
       getPublicBaseUrl(),
+      listSprekers({ data: params.eventId }),
+      listAgenda({ data: params.eventId }),
+      listFaq({ data: params.eventId }),
     ])
-    return { event, types, tickets, baseUrl }
+    return { event, types, tickets, baseUrl, sprekers, agenda, faq }
   },
   component: EventDetail,
 })
@@ -44,6 +61,9 @@ function EventDetail() {
     <div className="flex flex-col gap-8">
       <EventSectie />
       <TicketTypesSectie />
+      <SprekersSectie />
+      <AgendaSectie />
+      <FaqSectie />
       <UitgifteSectie
         eventId={event.id}
         types={types.map((t) => ({ id: t.id, naam: t.naam }))}
@@ -63,6 +83,9 @@ function EventSectie() {
   const [locatie, setLocatie] = useState(event.locatie ?? '')
   const [reEntry, setReEntry] = useState(event.re_entry_toegestaan)
   const [status, setStatus] = useState(event.status)
+  const [categorie, setCategorie] = useState<Categorie | ''>(event.categorie ?? '')
+  const [beschrijving, setBeschrijving] = useState(event.beschrijving ?? '')
+  const [coverUrl, setCoverUrl] = useState(event.cover_afbeelding_url ?? '')
   const [fout, setFout] = useState<string | null>(null)
 
   async function opslaan(e: React.FormEvent) {
@@ -78,6 +101,9 @@ function EventSectie() {
           locatie: locatie || null,
           re_entry_toegestaan: reEntry,
           status,
+          categorie: categorie || null,
+          beschrijving: beschrijving || null,
+          cover_afbeelding_url: coverUrl || null,
         },
       })
       setOpen(false)
@@ -187,6 +213,39 @@ function EventSectie() {
               </select>
             </label>
           </div>
+          <label className="flex flex-col gap-1">
+            <span className="text-sm font-medium">Categorie (publiek)</span>
+            <select
+              value={categorie}
+              onChange={(e) => setCategorie(e.target.value as Categorie | '')}
+              className="rounded border border-gray-300 px-3 py-2"
+            >
+              <option value="">— geen —</option>
+              {eventCategories.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-sm font-medium">Beschrijving (publiek)</span>
+            <textarea
+              value={beschrijving}
+              onChange={(e) => setBeschrijving(e.target.value)}
+              rows={4}
+              className="rounded border border-gray-300 px-3 py-2"
+            />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-sm font-medium">Cover-afbeelding URL (publiek)</span>
+            <input
+              value={coverUrl}
+              onChange={(e) => setCoverUrl(e.target.value)}
+              placeholder="https://…"
+              className="rounded border border-gray-300 px-3 py-2"
+            />
+          </label>
           {fout && <p className="text-sm text-red-600">{fout}</p>}
           <button
             type="submit"
@@ -197,6 +256,214 @@ function EventSectie() {
         </form>
       )}
     </section>
+  )
+}
+
+// Generieke opmaak voor een beheersectie met een lijst + verwijderknoppen.
+function ContentSectie({
+  titel,
+  leeg,
+  children,
+}: {
+  titel: string
+  leeg: boolean
+  children: React.ReactNode
+}) {
+  return (
+    <section>
+      <h2 className="mb-3 text-lg font-semibold">{titel}</h2>
+      {leeg && <p className="mb-3 text-sm text-gray-500">Nog niets toegevoegd.</p>}
+      <div className="flex flex-col gap-2">{children}</div>
+    </section>
+  )
+}
+
+function VerwijderKnop({ onClick }: { onClick: () => void }) {
+  return (
+    <button onClick={onClick} className="text-sm text-red-600 hover:underline" type="button">
+      Verwijderen
+    </button>
+  )
+}
+
+function SprekersSectie() {
+  const { event, sprekers } = Route.useLoaderData()
+  const router = useRouter()
+  const [naam, setNaam] = useState('')
+  const [rol, setRol] = useState('')
+  const [avatarUrl, setAvatarUrl] = useState('')
+
+  async function toevoegen(e: React.FormEvent) {
+    e.preventDefault()
+    await createSpreker({ data: { event_id: event.id, naam, rol, avatar_url: avatarUrl } })
+    setNaam('')
+    setRol('')
+    setAvatarUrl('')
+    router.invalidate()
+  }
+
+  return (
+    <ContentSectie titel="Sprekers / Line-up (publiek)" leeg={sprekers.length === 0}>
+      {sprekers.map((s) => (
+        <div key={s.id} className="flex items-center justify-between rounded border border-gray-200 px-3 py-2">
+          <span className="text-sm">
+            <strong>{s.naam}</strong>
+            {s.rol ? ` · ${s.rol}` : ''}
+          </span>
+          <VerwijderKnop
+            onClick={async () => {
+              await deleteSpreker({ data: s.id })
+              router.invalidate()
+            }}
+          />
+        </div>
+      ))}
+      <form onSubmit={toevoegen} className="mt-2 flex flex-wrap gap-2">
+        <input
+          required
+          value={naam}
+          onChange={(e) => setNaam(e.target.value)}
+          placeholder="Naam"
+          className="flex-1 rounded border border-gray-300 px-3 py-2 text-sm"
+        />
+        <input
+          value={rol}
+          onChange={(e) => setRol(e.target.value)}
+          placeholder="Rol (bv. DJ)"
+          className="flex-1 rounded border border-gray-300 px-3 py-2 text-sm"
+        />
+        <input
+          value={avatarUrl}
+          onChange={(e) => setAvatarUrl(e.target.value)}
+          placeholder="Avatar-URL"
+          className="flex-1 rounded border border-gray-300 px-3 py-2 text-sm"
+        />
+        <button type="submit" className="rounded bg-black px-4 py-2 text-sm font-medium text-white">
+          Toevoegen
+        </button>
+      </form>
+    </ContentSectie>
+  )
+}
+
+function AgendaSectie() {
+  const { event, agenda } = Route.useLoaderData()
+  const router = useRouter()
+  const [tijd, setTijd] = useState('')
+  const [titel, setTitel] = useState('')
+  const [subtitel, setSubtitel] = useState('')
+  const [beschrijving, setBeschrijving] = useState('')
+
+  async function toevoegen(e: React.FormEvent) {
+    e.preventDefault()
+    await createAgenda({ data: { event_id: event.id, tijd, titel, subtitel, beschrijving } })
+    setTijd('')
+    setTitel('')
+    setSubtitel('')
+    setBeschrijving('')
+    router.invalidate()
+  }
+
+  return (
+    <ContentSectie titel="Agenda (publiek)" leeg={agenda.length === 0}>
+      {agenda.map((a) => (
+        <div key={a.id} className="flex items-center justify-between rounded border border-gray-200 px-3 py-2">
+          <span className="text-sm">
+            <strong>{a.tijd}</strong> · {a.titel}
+            {a.subtitel ? ` — ${a.subtitel}` : ''}
+          </span>
+          <VerwijderKnop
+            onClick={async () => {
+              await deleteAgenda({ data: a.id })
+              router.invalidate()
+            }}
+          />
+        </div>
+      ))}
+      <form onSubmit={toevoegen} className="mt-2 flex flex-wrap gap-2">
+        <input
+          required
+          value={tijd}
+          onChange={(e) => setTijd(e.target.value)}
+          placeholder="Tijd (bv. 09.00)"
+          className="w-28 rounded border border-gray-300 px-3 py-2 text-sm"
+        />
+        <input
+          required
+          value={titel}
+          onChange={(e) => setTitel(e.target.value)}
+          placeholder="Titel"
+          className="flex-1 rounded border border-gray-300 px-3 py-2 text-sm"
+        />
+        <input
+          value={subtitel}
+          onChange={(e) => setSubtitel(e.target.value)}
+          placeholder="Subtitel"
+          className="flex-1 rounded border border-gray-300 px-3 py-2 text-sm"
+        />
+        <input
+          value={beschrijving}
+          onChange={(e) => setBeschrijving(e.target.value)}
+          placeholder="Beschrijving"
+          className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+        />
+        <button type="submit" className="rounded bg-black px-4 py-2 text-sm font-medium text-white">
+          Toevoegen
+        </button>
+      </form>
+    </ContentSectie>
+  )
+}
+
+function FaqSectie() {
+  const { event, faq } = Route.useLoaderData()
+  const router = useRouter()
+  const [vraag, setVraag] = useState('')
+  const [antwoord, setAntwoord] = useState('')
+
+  async function toevoegen(e: React.FormEvent) {
+    e.preventDefault()
+    await createFaq({ data: { event_id: event.id, vraag, antwoord } })
+    setVraag('')
+    setAntwoord('')
+    router.invalidate()
+  }
+
+  return (
+    <ContentSectie titel="Veelgestelde vragen (publiek)" leeg={faq.length === 0}>
+      {faq.map((f) => (
+        <div key={f.id} className="flex items-center justify-between rounded border border-gray-200 px-3 py-2">
+          <span className="text-sm">
+            <strong>{f.vraag}</strong>
+            {f.antwoord ? ` — ${f.antwoord}` : ''}
+          </span>
+          <VerwijderKnop
+            onClick={async () => {
+              await deleteFaq({ data: f.id })
+              router.invalidate()
+            }}
+          />
+        </div>
+      ))}
+      <form onSubmit={toevoegen} className="mt-2 flex flex-wrap gap-2">
+        <input
+          required
+          value={vraag}
+          onChange={(e) => setVraag(e.target.value)}
+          placeholder="Vraag"
+          className="flex-1 rounded border border-gray-300 px-3 py-2 text-sm"
+        />
+        <input
+          value={antwoord}
+          onChange={(e) => setAntwoord(e.target.value)}
+          placeholder="Antwoord"
+          className="flex-1 rounded border border-gray-300 px-3 py-2 text-sm"
+        />
+        <button type="submit" className="rounded bg-black px-4 py-2 text-sm font-medium text-white">
+          Toevoegen
+        </button>
+      </form>
+    </ContentSectie>
   )
 }
 

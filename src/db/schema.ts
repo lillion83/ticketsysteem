@@ -20,6 +20,18 @@ export const scanResultaat = pgEnum('scan_resultaat', [
   'groen_re_entry',
 ])
 
+// Vaste categorie-taxonomie voor de publieke discovery-front-end. Spiegelt de
+// categorieën uit het ontwerp; UI-labels blijven Nederlands.
+export const eventCategorie = pgEnum('event_categorie', [
+  'Muziek',
+  'Tech',
+  'Business',
+  'Food & Drink',
+  'Health',
+  'Art & Design',
+  'Sports',
+])
+
 // --- Better Auth (core) ---
 // Infrastructuurtabellen van Better Auth. Bewust Engelse camelCase-veldnamen:
 // de drizzle-adapter matcht op deze JS-sleutels. DB-kolommen blijven snake_case
@@ -125,6 +137,11 @@ export const events = pgTable(
       .notNull()
       .default(false),
     status: text('status').notNull().default('concept'),
+    // Publieke discovery-velden (fase 2). Nullable: bestaande events hoeven ze
+    // niet te hebben, en alleen `status = 'actief'` events zijn publiek zichtbaar.
+    categorie: eventCategorie('categorie'),
+    beschrijving: text('beschrijving'),
+    cover_afbeelding_url: text('cover_afbeelding_url'),
     aangemaakt_op: timestamp('aangemaakt_op', { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -154,6 +171,73 @@ export const ticketTypes = pgTable(
   (t) => [
     index('ticket_types_organization_id_idx').on(t.organization_id),
     index('ticket_types_event_id_idx').on(t.event_id),
+  ],
+)
+
+// --- Publieke event-inhoud (fase 2, discovery-front-end) ---
+// Sprekers/line-up, agenda en FAQ per event. Elke tabel draagt organization_id
+// (harde regel 3) en een `volgorde` voor stabiele sortering in de UI.
+
+export const eventSprekers = pgTable(
+  'event_sprekers',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    event_id: uuid('event_id')
+      .notNull()
+      .references(() => events.id),
+    organization_id: uuid('organization_id')
+      .notNull()
+      .references(() => organizations.id),
+    naam: text('naam').notNull(),
+    rol: text('rol'),
+    avatar_url: text('avatar_url'),
+    volgorde: numeric('volgorde').notNull().default('0'),
+  },
+  (t) => [
+    index('event_sprekers_organization_id_idx').on(t.organization_id),
+    index('event_sprekers_event_id_idx').on(t.event_id),
+  ],
+)
+
+export const eventAgenda = pgTable(
+  'event_agenda',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    event_id: uuid('event_id')
+      .notNull()
+      .references(() => events.id),
+    organization_id: uuid('organization_id')
+      .notNull()
+      .references(() => organizations.id),
+    tijd: text('tijd').notNull(),
+    titel: text('titel').notNull(),
+    subtitel: text('subtitel'),
+    beschrijving: text('beschrijving'),
+    volgorde: numeric('volgorde').notNull().default('0'),
+  },
+  (t) => [
+    index('event_agenda_organization_id_idx').on(t.organization_id),
+    index('event_agenda_event_id_idx').on(t.event_id),
+  ],
+)
+
+export const eventFaq = pgTable(
+  'event_faq',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    event_id: uuid('event_id')
+      .notNull()
+      .references(() => events.id),
+    organization_id: uuid('organization_id')
+      .notNull()
+      .references(() => organizations.id),
+    vraag: text('vraag').notNull(),
+    antwoord: text('antwoord'),
+    volgorde: numeric('volgorde').notNull().default('0'),
+  },
+  (t) => [
+    index('event_faq_organization_id_idx').on(t.organization_id),
+    index('event_faq_event_id_idx').on(t.event_id),
   ],
 )
 

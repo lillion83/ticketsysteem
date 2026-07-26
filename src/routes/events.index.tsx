@@ -1,6 +1,8 @@
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
-import { PinIcon, SiteFooter, SiteNav, SitePage } from '#/components/discovery/site'
-import { allEvents, dateFilters, overviewCategoryFilters } from '#/components/discovery/data'
+import { PinIcon, SiteFooter, SiteNav, SitePage, coverStyle } from '#/components/discovery/site'
+import { dateFilters, eventCategories } from '#/components/discovery/data'
+import { formatPrice, useCurrency } from '#/components/discovery/currency'
+import { listPublicEvents } from '#/server/discovery'
 
 type SortOrder = 'relevantie' | 'prijs' | 'datum'
 
@@ -28,17 +30,15 @@ export const Route = createFileRoute('/events/')({
         : 'relevantie',
     page: typeof search.page === 'number' && search.page > 0 ? search.page : 1,
   }),
+  loader: () => listPublicEvents(),
   component: EventsOverzicht,
 })
 
-function priceValue(price: string): number {
-  const match = price.match(/SRD\s*([\d.]+)/)
-  return match ? Number(match[1].replace('.', '')) : 0
-}
-
 function EventsOverzicht() {
+  const allEvents = Route.useLoaderData()
   const search = Route.useSearch()
   const navigate = useNavigate({ from: Route.fullPath })
+  const currency = useCurrency()
 
   // Zoekparameters met standaardwaarden (alle URL-velden zijn optioneel).
   const q = search.q ?? ''
@@ -60,14 +60,14 @@ function EventsOverzicht() {
   }
 
   const filtered = allEvents
-    .filter((ev) => (selectedCategories.length === 0 ? true : selectedCategories.includes(ev.category)))
+    .filter((ev) => (selectedCategories.length === 0 ? true : ev.categorie !== null && selectedCategories.includes(ev.categorie)))
     .filter((ev) => {
       const needle = q.trim().toLowerCase()
       if (!needle) return true
-      return `${ev.title} ${ev.location} ${ev.category}`.toLowerCase().includes(needle)
+      return `${ev.titel} ${ev.locatie ?? ''} ${ev.categorie ?? ''}`.toLowerCase().includes(needle)
     })
     .sort((a, b) => {
-      if (sort === 'prijs') return priceValue(a.price) - priceValue(b.price)
+      if (sort === 'prijs') return (a.prijsVanafSrd ?? 0) - (b.prijsVanafSrd ?? 0)
       return 0
     })
 
@@ -102,7 +102,7 @@ function EventsOverzicht() {
 
             <FilterLabel>Categorieën</FilterLabel>
             <div className="mb-6 flex flex-col gap-3">
-              {overviewCategoryFilters.map((name) => (
+              {eventCategories.map((name) => (
                 <label key={name} className="flex cursor-pointer items-center gap-2.5 text-[14px] text-[#334155]">
                   <input
                     type="checkbox"
@@ -183,7 +183,7 @@ function EventsOverzicht() {
 
             <div className="mb-5 text-[14px] text-[#64748B]">
               Toont <strong className="text-[#0F172A]">{filtered.length}</strong> van{' '}
-              <strong className="text-[#0F172A]">128</strong> events
+              <strong className="text-[#0F172A]">{allEvents.length}</strong> events
             </div>
 
             <div className="mb-9 grid gap-[22px] sm:grid-cols-2 lg:grid-cols-3">
@@ -194,21 +194,25 @@ function EventsOverzicht() {
                   params={{ eventId: ev.id }}
                   className="block overflow-hidden rounded-[16px] border border-[#E5E7EB] bg-white text-[#0F172A] shadow-[0_1px_3px_rgba(15,23,42,0.05)] transition hover:shadow-md"
                 >
-                  <div className="relative h-[140px]" style={ev.pattern}>
-                    <div className="absolute left-2.5 top-2.5 rounded-full bg-[#DBEAFE] px-2.5 py-1 text-[11px] font-bold text-[#2563EB]">
-                      {ev.category}
-                    </div>
+                  <div className="relative h-[140px]" style={coverStyle(ev.categorie)}>
+                    {ev.categorie && (
+                      <div className="absolute left-2.5 top-2.5 rounded-full bg-[#DBEAFE] px-2.5 py-1 text-[11px] font-bold text-[#2563EB]">
+                        {ev.categorie}
+                      </div>
+                    )}
                   </div>
                   <div className="p-4">
-                    <div className="mb-2 text-[15px] font-extrabold leading-[1.3]">{ev.title}</div>
+                    <div className="mb-2 text-[15px] font-extrabold leading-[1.3]">{ev.titel}</div>
                     <div className="mb-1.5 text-[12.5px] text-[#64748B]">{ev.dateLine}</div>
                     <div className="mb-3 flex items-center gap-1.5 text-[12.5px] text-[#64748B]">
                       <PinIcon size={12} />
-                      {ev.location}
+                      {ev.locatie ?? 'Locatie volgt'}
                     </div>
                     <div className="flex items-center justify-between border-t border-[#F1F5F9] pt-3">
-                      <span className="text-[13.5px] font-extrabold text-[#2563EB]">{ev.price}</span>
-                      <span className="text-[12px] text-[#94A3B8]">{ev.participants} aanmeldingen</span>
+                      <span className="text-[13.5px] font-extrabold text-[#2563EB]">
+                        {ev.prijsVanafSrd === null ? 'Gratis' : formatPrice(ev.prijsVanafSrd, currency)}
+                      </span>
+                      <span className="text-[12px] text-[#94A3B8]">{ev.aanmeldingen} aanmeldingen</span>
                     </div>
                   </div>
                 </Link>
@@ -221,7 +225,7 @@ function EventsOverzicht() {
               </div>
             )}
 
-            {/* Paginering (statisch, zoals ontwerp) */}
+            {/* Paginering (statisch; echte paginering volgt zodra er meer events zijn) */}
             <div className="flex justify-center gap-2">
               {['1', '2', '3', '...', '8'].map((label, i) => {
                 const isActive = label === String(currentPage)
@@ -250,7 +254,5 @@ function EventsOverzicht() {
 }
 
 function FilterLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="mb-3 text-[12px] font-bold uppercase tracking-[0.05em] text-[#94A3B8]">{children}</div>
-  )
+  return <div className="mb-3 text-[12px] font-bold uppercase tracking-[0.05em] text-[#94A3B8]">{children}</div>
 }

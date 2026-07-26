@@ -1,6 +1,9 @@
 import { Link, createFileRoute, useRouter } from '@tanstack/react-router'
 import { useState } from 'react'
 import { createEvent, listEvents } from '#/server/events'
+import { eventCategories } from '#/components/discovery/data'
+
+type Categorie = (typeof eventCategories)[number]
 
 export const Route = createFileRoute('/admin/')({
   loader: () => listEvents(),
@@ -16,6 +19,9 @@ function EventsOverzicht() {
   const [eind, setEind] = useState('')
   const [locatie, setLocatie] = useState('')
   const [reEntry, setReEntry] = useState(false)
+  const [categorie, setCategorie] = useState<Categorie | ''>('')
+  const [beschrijving, setBeschrijving] = useState('')
+  const [coverUrl, setCoverUrl] = useState('')
   const [fout, setFout] = useState<string | null>(null)
   const [bezig, setBezig] = useState(false)
 
@@ -32,6 +38,9 @@ function EventsOverzicht() {
           locatie: locatie || null,
           re_entry_toegestaan: reEntry,
           status: 'concept',
+          categorie: categorie || null,
+          beschrijving: beschrijving || null,
+          cover_afbeelding_url: coverUrl || null,
         },
       })
       setOpen(false)
@@ -40,6 +49,9 @@ function EventsOverzicht() {
       setEind('')
       setLocatie('')
       setReEntry(false)
+      setCategorie('')
+      setBeschrijving('')
+      setCoverUrl('')
       router.invalidate()
     } catch (err) {
       setFout(err instanceof Error ? err.message : 'Opslaan mislukt')
@@ -101,6 +113,39 @@ function EventsOverzicht() {
             <input
               value={locatie}
               onChange={(e) => setLocatie(e.target.value)}
+              className="rounded border border-gray-300 px-3 py-2"
+            />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-sm font-medium">Categorie (publiek)</span>
+            <select
+              value={categorie}
+              onChange={(e) => setCategorie(e.target.value as Categorie | '')}
+              className="rounded border border-gray-300 px-3 py-2"
+            >
+              <option value="">— geen —</option>
+              {eventCategories.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-sm font-medium">Beschrijving (publiek)</span>
+            <textarea
+              value={beschrijving}
+              onChange={(e) => setBeschrijving(e.target.value)}
+              rows={3}
+              className="rounded border border-gray-300 px-3 py-2"
+            />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-sm font-medium">Cover-afbeelding URL (publiek)</span>
+            <input
+              value={coverUrl}
+              onChange={(e) => setCoverUrl(e.target.value)}
+              placeholder="https://…"
               className="rounded border border-gray-300 px-3 py-2"
             />
           </label>
