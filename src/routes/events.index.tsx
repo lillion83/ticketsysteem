@@ -2,9 +2,14 @@ import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { PinIcon, SiteFooter, SiteNav, SitePage, coverStyle } from '#/components/discovery/site'
 import { dateFilters, eventCategories } from '#/components/discovery/data'
 import { formatPrice, useCurrency } from '#/components/discovery/currency'
+import { isDitWeekend, isOpDatum, isVandaag } from '#/lib/datum'
 import { listPublicEvents } from '#/server/discovery'
 
 type SortOrder = 'relevantie' | 'prijs' | 'datum'
+type PrijsType = 'gratis' | 'betaald'
+
+const MAX_PRIJS = 2500
+const PER_PAGINA = 9
 
 // Zoek-/filterstate zit in de URL (validateSearch): deelbaar en bookmarkbaar,
 // zoals een echte zoekpagina hoort te werken. Alle velden optioneel zodat
@@ -13,6 +18,9 @@ type EventsSearch = {
   q?: string
   categories?: Array<string>
   date?: string
+  datum?: string
+  maxPrijs?: number
+  prijsType?: PrijsType
   sort?: SortOrder
   page?: number
 }
@@ -24,6 +32,12 @@ export const Route = createFileRoute('/events/')({
       ? search.categories.filter((c): c is string => typeof c === 'string')
       : [],
     date: typeof search.date === 'string' ? search.date : 'Elke datum',
+    datum: typeof search.datum === 'string' ? search.datum : undefined,
+    maxPrijs:
+      typeof search.maxPrijs === 'number' && search.maxPrijs >= 0 && search.maxPrijs <= MAX_PRIJS
+        ? search.maxPrijs
+        : MAX_PRIJS,
+    prijsType: search.prijsType === 'gratis' || search.prijsType === 'betaald' ? search.prijsType : undefined,
     sort:
       search.sort === 'prijs' || search.sort === 'datum' || search.sort === 'relevantie'
         ? search.sort
@@ -33,6 +47,19 @@ export const Route = createFileRoute('/events/')({
   loader: () => listPublicEvents(),
   component: EventsOverzicht,
 })
+
+// Compacte paginanummers met ellipsis voor lange lijsten.
+function pageNumbers(current: number, total: number): Array<number | 'gap'> {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1)
+  const set = new Set([1, total, current, current - 1, current + 1])
+  const pages = [...set].filter((p) => p >= 1 && p <= total).sort((a, b) => a - b)
+  const out: Array<number | 'gap'> = []
+  for (let i = 0; i < pages.length; i++) {
+    if (i > 0 && pages[i] - pages[i - 1] > 1) out.push('gap')
+    out.push(pages[i])
+  }
+  return out
+}
 
 function EventsOverzicht() {
   const allEvents = Route.useLoaderData()
@@ -44,19 +71,24 @@ function EventsOverzicht() {
   const q = search.q ?? ''
   const selectedCategories = search.categories ?? []
   const selectedDate = search.date ?? 'Elke datum'
+  const gekozenDatum = search.datum ?? ''
+  const maxPrijs = search.maxPrijs ?? MAX_PRIJS
+  const prijsType = search.prijsType
   const sort: SortOrder = search.sort ?? 'relevantie'
-  const currentPage = search.page ?? 1
 
-  // Ondiepe merge van zoekparameters in de URL.
+  // Ondiepe merge van zoekparameters in de URL. Elke filterwijziging reset de pagina.
   function setSearch(patch: Partial<EventsSearch>) {
     navigate({ search: (prev) => ({ ...prev, ...patch }) })
+  }
+  function setFilter(patch: Partial<EventsSearch>) {
+    setSearch({ ...patch, page: 1 })
   }
 
   function toggleCategory(name: string) {
     const next = selectedCategories.includes(name)
       ? selectedCategories.filter((c) => c !== name)
       : [...selectedCategories, name]
-    setSearch({ categories: next, page: 1 })
+    setFilter({ categories: next })
   }
 
   const filtered = allEvents
@@ -66,10 +98,28 @@ function EventsOverzicht() {
       if (!needle) return true
       return `${ev.titel} ${ev.locatie ?? ''} ${ev.categorie ?? ''}`.toLowerCase().includes(needle)
     })
+    .filter((ev) => {
+      const d = new Date(ev.datumStart)
+      if (selectedDate === 'Vandaag') return isVandaag(d)
+      if (selectedDate === 'Dit weekend') return isDitWeekend(d)
+      if (selectedDate === 'Kies datum...') return gekozenDatum ? isOpDatum(d, gekozenDatum) : true
+      return true
+    })
+    .filter((ev) => (ev.prijsVanafSrd ?? 0) <= maxPrijs)
+    .filter((ev) => {
+      if (prijsType === 'gratis') return ev.prijsVanafSrd === null || ev.prijsVanafSrd === 0
+      if (prijsType === 'betaald') return ev.prijsVanafSrd !== null && ev.prijsVanafSrd > 0
+      return true
+    })
     .sort((a, b) => {
       if (sort === 'prijs') return (a.prijsVanafSrd ?? 0) - (b.prijsVanafSrd ?? 0)
+      if (sort === 'datum') return a.datumStart.localeCompare(b.datumStart)
       return 0
     })
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PER_PAGINA))
+  const currentPage = Math.min(search.page ?? 1, totalPages)
+  const paged = filtered.slice((currentPage - 1) * PER_PAGINA, currentPage * PER_PAGINA)
 
   return (
     <SitePage>
@@ -93,7 +143,17 @@ function EventsOverzicht() {
             <div className="mb-5 flex items-center justify-between">
               <span className="text-[17px] font-extrabold">Filters</span>
               <button
-                onClick={() => setSearch({ q: '', categories: [], date: 'Elke datum', page: 1 })}
+                onClick={() =>
+                  setSearch({
+                    q: '',
+                    categories: [],
+                    date: 'Elke datum',
+                    datum: undefined,
+                    maxPrijs: MAX_PRIJS,
+                    prijsType: undefined,
+                    page: 1,
+                  })
+                }
                 className="text-[13px] font-bold text-[#2563EB] hover:text-[#1D4ED8]"
               >
                 Wis alles
@@ -123,25 +183,55 @@ function EventsOverzicht() {
                     type="radio"
                     name="datum"
                     checked={selectedDate === name}
-                    onChange={() => setSearch({ date: name })}
+                    onChange={() => setFilter({ date: name })}
                     className="h-4 w-4 accent-[#2563EB]"
                   />
                   {name}
                 </label>
               ))}
+              {selectedDate === 'Kies datum...' && (
+                <input
+                  type="date"
+                  value={gekozenDatum}
+                  onChange={(e) => setFilter({ datum: e.target.value })}
+                  className="rounded-[10px] border border-[#E5E7EB] px-3 py-2 text-[13.5px]"
+                />
+              )}
             </div>
 
             <FilterLabel>Prijs</FilterLabel>
             <div className="mb-2 flex justify-between text-[13px] text-[#64748B]">
               <span>SRD 0</span>
-              <span>SRD 2.500</span>
+              <span>SRD {maxPrijs.toLocaleString('nl-NL')}</span>
             </div>
-            <input type="range" min={0} max={2500} defaultValue={2500} className="mb-4 w-full accent-[#2563EB]" />
+            <input
+              type="range"
+              min={0}
+              max={MAX_PRIJS}
+              step={50}
+              value={maxPrijs}
+              onChange={(e) => setFilter({ maxPrijs: Number(e.target.value) })}
+              className="mb-4 w-full accent-[#2563EB]"
+            />
             <div className="flex gap-2.5">
-              <button className="flex-1 rounded-full border border-[#E5E7EB] py-2.5 text-[13px] font-bold hover:bg-[#F1F5F9]">
+              <button
+                onClick={() => setFilter({ prijsType: prijsType === 'gratis' ? undefined : 'gratis' })}
+                className={`flex-1 rounded-full border py-2.5 text-[13px] font-bold ${
+                  prijsType === 'gratis'
+                    ? 'border-[#2563EB] bg-[#2563EB] text-white'
+                    : 'border-[#E5E7EB] hover:bg-[#F1F5F9]'
+                }`}
+              >
                 Gratis
               </button>
-              <button className="flex-1 rounded-full border border-[#E5E7EB] py-2.5 text-[13px] font-bold hover:bg-[#F1F5F9]">
+              <button
+                onClick={() => setFilter({ prijsType: prijsType === 'betaald' ? undefined : 'betaald' })}
+                className={`flex-1 rounded-full border py-2.5 text-[13px] font-bold ${
+                  prijsType === 'betaald'
+                    ? 'border-[#2563EB] bg-[#2563EB] text-white'
+                    : 'border-[#E5E7EB] hover:bg-[#F1F5F9]'
+                }`}
+              >
                 Betaald
               </button>
             </div>
@@ -165,7 +255,7 @@ function EventsOverzicht() {
                 </svg>
                 <input
                   value={q}
-                  onChange={(e) => setSearch({ q: e.target.value, page: 1 })}
+                  onChange={(e) => setFilter({ q: e.target.value })}
                   placeholder="Zoek events op naam, artiest of locatie..."
                   className="w-full rounded-[12px] border border-[#E5E7EB] py-3.5 pl-[42px] pr-4 text-[14px] outline-none focus:border-[#2563EB]"
                 />
@@ -182,12 +272,12 @@ function EventsOverzicht() {
             </div>
 
             <div className="mb-5 text-[14px] text-[#64748B]">
-              Toont <strong className="text-[#0F172A]">{filtered.length}</strong> van{' '}
-              <strong className="text-[#0F172A]">{allEvents.length}</strong> events
+              Toont <strong className="text-[#0F172A]">{paged.length}</strong> van{' '}
+              <strong className="text-[#0F172A]">{filtered.length}</strong> events
             </div>
 
             <div className="mb-9 grid gap-[22px] sm:grid-cols-2 lg:grid-cols-3">
-              {filtered.map((ev) => (
+              {paged.map((ev) => (
                 <Link
                   key={ev.id}
                   to="/events/$eventId"
@@ -225,25 +315,27 @@ function EventsOverzicht() {
               </div>
             )}
 
-            {/* Paginering (statisch; echte paginering volgt zodra er meer events zijn) */}
-            <div className="flex justify-center gap-2">
-              {['1', '2', '3', '...', '8'].map((label, i) => {
-                const isActive = label === String(currentPage)
-                const isNumber = /^\d+$/.test(label)
-                return (
-                  <button
-                    key={i}
-                    onClick={() => isNumber && setSearch({ page: Number(label) })}
-                    disabled={!isNumber}
-                    className={`flex h-9 w-9 items-center justify-center rounded-[10px] border border-[#E5E7EB] text-[13px] font-bold ${
-                      isActive ? 'bg-[#2563EB] text-white' : 'bg-white text-[#0F172A] hover:bg-[#F1F5F9]'
-                    } ${!isNumber ? 'cursor-default' : ''}`}
-                  >
-                    {label}
-                  </button>
-                )
-              })}
-            </div>
+            {totalPages > 1 && (
+              <div className="flex justify-center gap-2">
+                {pageNumbers(currentPage, totalPages).map((p, i) =>
+                  p === 'gap' ? (
+                    <span key={`gap-${i}`} className="flex h-9 w-9 items-center justify-center text-[13px] text-[#94A3B8]">
+                      …
+                    </span>
+                  ) : (
+                    <button
+                      key={p}
+                      onClick={() => setSearch({ page: p })}
+                      className={`flex h-9 w-9 items-center justify-center rounded-[10px] border border-[#E5E7EB] text-[13px] font-bold ${
+                        p === currentPage ? 'bg-[#2563EB] text-white' : 'bg-white text-[#0F172A] hover:bg-[#F1F5F9]'
+                      }`}
+                    >
+                      {p}
+                    </button>
+                  ),
+                )}
+              </div>
+            )}
           </main>
         </div>
       </div>

@@ -1,4 +1,5 @@
-import { createFileRoute, Link } from '@tanstack/react-router'
+import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
+import { useState } from 'react'
 import {
   CheckIcon,
   HeartIcon,
@@ -29,8 +30,30 @@ function prijsLabel(prijsVanafSrd: number | null, currency: ReturnType<typeof us
 function Home() {
   const events = Route.useLoaderData()
   const currency = useCurrency()
+  const navigate = useNavigate()
   const featured = events.slice(0, 3)
   const upcoming = events.slice(3, 6).length > 0 ? events.slice(3, 6) : events.slice(0, 3)
+
+  const [zoekEvent, setZoekEvent] = useState('')
+  const [zoekLocatie, setZoekLocatie] = useState('')
+  const [zoekDatum, setZoekDatum] = useState('')
+
+  // Zoekbalk → /events met de bestaande searchparams (zoekterm + evt. datum).
+  function zoek(e: React.FormEvent) {
+    e.preventDefault()
+    const q = [zoekEvent, zoekLocatie]
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .join(' ')
+    navigate({
+      to: '/events',
+      search: {
+        q: q || undefined,
+        date: zoekDatum ? 'Kies datum...' : undefined,
+        datum: zoekDatum || undefined,
+      },
+    })
+  }
 
   return (
     <SitePage>
@@ -101,18 +124,33 @@ function Home() {
 
       {/* Zoekbalk */}
       <section className="mx-auto mb-14 max-w-[1100px] px-6 md:px-12">
-        <div className="flex flex-col gap-4 rounded-[18px] border border-[#E5E7EB] bg-white p-[18px_24px] shadow-[0_8px_24px_rgba(15,23,42,0.06)] md:flex-row md:items-center md:gap-0">
-          <SearchField label="Event" placeholder="Waar ben je naar op zoek?" divider />
-          <SearchField label="Locatie" placeholder="Paramaribo, Suriname" divider />
-          <SearchField label="Datum" placeholder="Kies een datum" />
-          <Link
-            to="/events"
+        <form
+          onSubmit={zoek}
+          className="flex flex-col gap-4 rounded-[18px] border border-[#E5E7EB] bg-white p-[18px_24px] shadow-[0_8px_24px_rgba(15,23,42,0.06)] md:flex-row md:items-center md:gap-0"
+        >
+          <SearchField
+            label="Event"
+            placeholder="Waar ben je naar op zoek?"
+            value={zoekEvent}
+            onChange={setZoekEvent}
+            divider
+          />
+          <SearchField
+            label="Locatie"
+            placeholder="Paramaribo, Suriname"
+            value={zoekLocatie}
+            onChange={setZoekLocatie}
+            divider
+          />
+          <SearchField label="Datum" type="date" value={zoekDatum} onChange={setZoekDatum} />
+          <button
+            type="submit"
             className="flex items-center justify-center gap-2 whitespace-nowrap rounded-[12px] bg-[#2563EB] px-6 py-3 text-[14px] font-bold text-white hover:bg-[#1D4ED8] md:ml-4"
           >
             <SearchIcon />
             Zoeken
-          </Link>
-        </div>
+          </button>
+        </form>
       </section>
 
       {/* Categorieën */}
@@ -280,7 +318,21 @@ function EmptyState() {
   )
 }
 
-function SearchField({ label, placeholder, divider }: { label: string; placeholder: string; divider?: boolean }) {
+function SearchField({
+  label,
+  placeholder,
+  value,
+  onChange,
+  type = 'text',
+  divider,
+}: {
+  label: string
+  placeholder?: string
+  value: string
+  onChange: (v: string) => void
+  type?: string
+  divider?: boolean
+}) {
   return (
     <div
       className={`flex flex-1 flex-col gap-1 md:px-5 md:first:pl-0 ${
@@ -289,8 +341,11 @@ function SearchField({ label, placeholder, divider }: { label: string; placehold
     >
       <span className="text-[11px] font-bold uppercase tracking-[0.04em] text-[#94A3B8]">{label}</span>
       <input
+        type={type}
         placeholder={placeholder}
-        className="border-none text-[14px] text-[#0F172A] outline-none placeholder:text-[#94A3B8]"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="border-none bg-transparent text-[14px] text-[#0F172A] outline-none placeholder:text-[#94A3B8]"
       />
     </div>
   )

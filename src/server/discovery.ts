@@ -24,6 +24,8 @@ export type PublicEventCard = {
   categorie: string | null
   titel: string
   dateLine: string
+  // ISO-startdatum, zodat de client op datum kan filteren en sorteren.
+  datumStart: string
   locatie: string | null
   prijsVanafSrd: number | null
   aanmeldingen: number
@@ -71,6 +73,7 @@ export const listPublicEvents = createServerFn({ method: 'GET' }).handler(async 
       categorie: e.categorie,
       titel: e.naam,
       dateLine: formatDateLine(e.datum_start),
+      datumStart: e.datum_start.toISOString(),
       locatie: e.locatie,
       prijsVanafSrd: a?.minSrd ?? null,
       aanmeldingen: a?.verkocht ?? 0,

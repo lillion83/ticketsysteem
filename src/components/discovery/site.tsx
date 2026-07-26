@@ -97,7 +97,7 @@ const navLinks: Array<{ key: NavKey; label: string; to: string }> = [
   { key: 'home', label: 'Home', to: '/' },
   { key: 'events', label: 'Events', to: '/events' },
   { key: 'categories', label: 'Categories', to: '/events' },
-  { key: 'ticket', label: 'My Ticket', to: '/events' },
+  { key: 'ticket', label: 'Mijn Ticket', to: '/mijn-ticket' },
 ]
 
 export function SiteNav({ active }: { active?: NavKey }) {

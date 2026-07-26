@@ -1,7 +1,8 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { SiteFooter, SiteNav, SitePage, coverStyle, stripe } from '#/components/discovery/site'
 import { formatPrice, useCurrency } from '#/components/discovery/currency'
+import { isFavoriet, toggleFavoriet } from '#/components/discovery/favorites'
 import { getPublicEvent } from '#/server/discovery'
 import type { PublicEventDetail } from '#/server/discovery'
 import { createReservering } from '#/server/reserveringen'
@@ -24,6 +25,32 @@ function EventDetailPage() {
   const detail = Route.useLoaderData()
   const currency = useCurrency()
   const [reserveerOpen, setReserveerOpen] = useState(false)
+  const [opgeslagen, setOpgeslagen] = useState(false)
+
+  // Favoriet-status pas op de client laden (localStorage bestaat niet op de server).
+  useEffect(() => {
+    setOpgeslagen(isFavoriet(detail.id))
+  }, [detail.id])
+
+  // Alleen aangeroepen vanuit een client-event, dus window/navigator bestaan hier.
+  // Cast: niet elke browser heeft de Web Share API, dus behandel `share` als optioneel.
+  function deel() {
+    const url = window.location.href
+    const nav = navigator as unknown as {
+      share?: (d: { title: string; url: string }) => Promise<void>
+      clipboard: { writeText: (t: string) => Promise<void> }
+    }
+    if (nav.share) {
+      nav.share({ title: detail.titel, url }).catch(() => {})
+    } else {
+      nav.clipboard.writeText(url).catch(() => {})
+    }
+  }
+
+  // Google Maps-zoeklink op basis van de locatie.
+  const kaartUrl = detail.locatie
+    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(detail.locatie)}`
+    : null
 
   return (
     <SitePage>
@@ -186,9 +213,16 @@ function EventDetailPage() {
                   </DetailRow>
                 )}
               </div>
-              <a href="#kaart" className="mb-3.5 inline-block text-[13px] font-bold text-[#2563EB] hover:text-[#1D4ED8]">
-                Bekijk op Kaart
-              </a>
+              {kaartUrl && (
+                <a
+                  href={kaartUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mb-3.5 inline-block text-[13px] font-bold text-[#2563EB] hover:text-[#1D4ED8]"
+                >
+                  Bekijk op Kaart
+                </a>
+              )}
               <div className="relative mb-5 h-[120px] rounded-[12px]" style={stripe('#F0FDF4', '#DCFCE7')}>
                 <div className="absolute left-1/2 top-1/2 h-6 w-6 -translate-x-1/2 -translate-y-1/2 rounded-full border-[3px] border-white bg-[#2563EB] shadow-[0_2px_6px_rgba(0,0,0,0.3)]" />
               </div>
@@ -205,20 +239,27 @@ function EventDetailPage() {
                 Registreer Nu →
               </button>
               <div className="flex gap-2.5">
-                <RailButton>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0F172A" strokeWidth="2">
+                <RailButton onClick={() => setOpgeslagen(toggleFavoriet(detail.id))}>
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill={opgeslagen ? '#2563EB' : 'none'}
+                    stroke={opgeslagen ? '#2563EB' : '#0F172A'}
+                    strokeWidth="2"
+                  >
                     <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.8 1-1a5.5 5.5 0 0 0 0-7.8Z" />
                   </svg>
-                  Save
+                  {opgeslagen ? 'Opgeslagen' : 'Bewaar'}
                 </RailButton>
-                <RailButton>
+                <RailButton onClick={deel}>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0F172A" strokeWidth="2">
                     <circle cx="18" cy="5" r="3" />
                     <circle cx="6" cy="12" r="3" />
                     <circle cx="18" cy="19" r="3" />
                     <path d="M8.6 13.5 15.4 17.5M15.4 6.5 8.6 10.5" />
                   </svg>
-                  Share
+                  Deel
                 </RailButton>
               </div>
             </div>
@@ -231,9 +272,6 @@ function EventDetailPage() {
                 <div className="text-[12px] text-[#64748B]">Georganiseerd door</div>
                 <div className="text-[14.5px] font-extrabold">{detail.organisator}</div>
               </div>
-              <a href="#volgen" className="text-[13.5px] font-bold text-[#2563EB] hover:text-[#1D4ED8]">
-                Volgen
-              </a>
             </div>
 
             {detail.faqs.length > 0 && (
@@ -293,9 +331,12 @@ function DetailRow({ children }: { children: React.ReactNode }) {
   return <div className="flex gap-2.5 text-[14px] text-[#334155]">{children}</div>
 }
 
-function RailButton({ children }: { children: React.ReactNode }) {
+function RailButton({ children, onClick }: { children: React.ReactNode; onClick?: () => void }) {
   return (
-    <button className="flex flex-1 items-center justify-center gap-1.5 rounded-full border border-[#E5E7EB] py-3 text-[13.5px] font-bold hover:bg-[#F1F5F9]">
+    <button
+      onClick={onClick}
+      className="flex flex-1 items-center justify-center gap-1.5 rounded-full border border-[#E5E7EB] py-3 text-[13.5px] font-bold hover:bg-[#F1F5F9]"
+    >
       {children}
     </button>
   )
