@@ -4,6 +4,7 @@ import { and, desc, eq, ilike, or, sql } from 'drizzle-orm'
 import { db } from '#/db/index'
 import { ticketTypes, tickets } from '#/db/schema'
 import { requireAuth } from '#/server/session'
+import { vindKoperUserId } from '#/server/mijnTickets'
 import { signTicket } from '#/lib/ticketcode'
 
 export type IssueTicketInput = {
@@ -50,6 +51,10 @@ export const issueTicket = createServerFn({ method: 'POST' })
       const ticketId = randomUUID()
       const code = signTicket(data.event_id, ticketId)
 
+      // Koppel meteen aan een bestaand koper-account (fase K) als dat er is.
+      const koperEmail = data.koper_email?.trim() || null
+      const koperUserId = koperEmail ? await vindKoperUserId(koperEmail) : null
+
       const ticketRows = await tx
         .insert(tickets)
         .values({
@@ -60,7 +65,8 @@ export const issueTicket = createServerFn({ method: 'POST' })
           code,
           koper_naam: data.koper_naam.trim(),
           koper_telefoon: data.koper_telefoon?.trim() || null,
-          koper_email: data.koper_email?.trim() || null,
+          koper_email: koperEmail,
+          koper_user_id: koperUserId,
           verkocht_op: new Date(),
           verkocht_door_user_id: userId,
           verkoopkanaal: data.verkoopkanaal?.trim() || null,

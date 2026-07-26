@@ -37,7 +37,7 @@ export const requireAuth = createServerOnlyFn(
 /**
  * Lichte sessie-check voor route-guards (beforeLoad) en de layout. Geeft de
  * ingelogde gebruiker terug of null — gooit niet, zodat de guard zelf kan
- * redirecten naar /login.
+ * redirecten naar /login. `organizationId` is null voor kopers (fase K).
  */
 export const getCurrentUser = createServerFn({ method: 'GET' }).handler(
   async () => {
@@ -49,6 +49,22 @@ export const getCurrentUser = createServerFn({ method: 'GET' }).handler(
       id: session.user.id,
       name: session.user.name,
       email: session.user.email,
+      organizationId:
+        (session.user as { organizationId?: string }).organizationId ?? null,
     }
+  },
+)
+
+/**
+ * Sessie zonder org-eis, voor het kopersgedeelte (Mijn Tickets). Gooit als er
+ * geen sessie is. Server-only: leest request-headers.
+ */
+export const requireUser = createServerOnlyFn(
+  async (): Promise<{ userId: string; email: string }> => {
+    const session = await auth.api.getSession({
+      headers: getRequest().headers,
+    })
+    if (!session?.user) throw new Error('Niet ingelogd')
+    return { userId: session.user.id, email: session.user.email }
   },
 )

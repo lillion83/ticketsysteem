@@ -14,6 +14,8 @@ export const Route = createFileRoute('/events/new')({
   beforeLoad: async () => {
     const user = await getCurrentUser()
     if (!user) throw redirect({ to: '/login', search: { redirect: '/events/new' } })
+    // Alleen organisatoren (met organisatie) mogen publiceren; kopers niet.
+    if (!user.organizationId) throw redirect({ to: '/' })
   },
   component: OrganiseerEvent,
 })

@@ -304,6 +304,10 @@ export const tickets = pgTable(
     koper_naam: text('koper_naam'),
     koper_telefoon: text('koper_telefoon'),
     koper_email: text('koper_email'),
+    // Koppeling naar het koper-account (fase K), gevuld bij uitgifte of bij de
+    // eerste login met dit e-mailadres. Nullable: niet elk ticket heeft een koper
+    // die inlogt.
+    koper_user_id: uuid('koper_user_id').references(() => user.id),
     verkocht_op: timestamp('verkocht_op', { withTimezone: true }),
     // Verwijst naar de verkopende gebruiker (Better Auth). Nu altijd Amresh;
     // straks kan het de organisator zijn zonder migratie (PLAN §8).
@@ -323,6 +327,7 @@ export const tickets = pgTable(
     uniqueIndex('tickets_code_idx').on(t.code),
     index('tickets_organization_id_idx').on(t.organization_id),
     index('tickets_event_id_idx').on(t.event_id),
+    index('tickets_koper_user_id_idx').on(t.koper_user_id),
   ],
 )
 

@@ -12,6 +12,9 @@ export const Route = createFileRoute('/admin')({
   beforeLoad: async () => {
     const user = await getCurrentUser()
     if (!user) throw redirect({ to: '/login' })
+    // Kopers (Google/e-mailcode, fase K) hebben geen organisatie en horen niet in
+    // de admin — stuur ze naar de publieke site.
+    if (!user.organizationId) throw redirect({ to: '/' })
     return { user }
   },
   component: AdminLayout,

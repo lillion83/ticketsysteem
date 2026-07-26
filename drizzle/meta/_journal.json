@@ -43,6 +43,13 @@
       "when": 1785104849841,
       "tag": "0005_hard_shatterstar",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1785109749472,
+      "tag": "0006_fat_madame_hydra",
+      "breakpoints": true
     }
   ]
 }

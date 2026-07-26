@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { closeDb, db } from './index'
 import {
   eventAgenda,
@@ -6,7 +7,9 @@ import {
   events,
   organizations,
   ticketTypes,
+  tickets,
 } from './schema'
+import { signTicket } from '../lib/ticketcode'
 
 // Seed: één organisatie, één actief (publiek zichtbaar) testevent met
 // tickettypes én discovery-inhoud (categorie, beschrijving, sprekers, agenda, FAQ).
@@ -38,28 +41,51 @@ async function seed() {
     })
     .returning()
 
-  await db.insert(ticketTypes).values([
-    {
-      event_id: event.id,
-      organization_id: organisatie.id,
-      naam: 'Regulier',
-      prijs_srd: '150.00',
-      inkoopprijs_srd: '100.00',
-      aantal_beschikbaar: '150',
-      aantal_verkocht: '42',
-      features: ['Volledige toegang tot alle sessies', 'Toegang tot event-app'],
-    },
-    {
-      event_id: event.id,
-      organization_id: organisatie.id,
-      naam: 'VIP',
-      prijs_srd: '350.00',
-      inkoopprijs_srd: '250.00',
-      aantal_beschikbaar: '50',
-      aantal_verkocht: '8',
-      features: ['Alles in Regulier', 'VIP-lounge toegang', 'Gereserveerde plaatsen'],
-    },
-  ])
+  const [regulier] = await db
+    .insert(ticketTypes)
+    .values([
+      {
+        event_id: event.id,
+        organization_id: organisatie.id,
+        naam: 'Regulier',
+        prijs_srd: '150.00',
+        inkoopprijs_srd: '100.00',
+        aantal_beschikbaar: '150',
+        aantal_verkocht: '42',
+        features: ['Volledige toegang tot alle sessies', 'Toegang tot event-app'],
+      },
+      {
+        event_id: event.id,
+        organization_id: organisatie.id,
+        naam: 'VIP',
+        prijs_srd: '350.00',
+        inkoopprijs_srd: '250.00',
+        aantal_beschikbaar: '50',
+        aantal_verkocht: '8',
+        features: ['Alles in Regulier', 'VIP-lounge toegang', 'Gereserveerde plaatsen'],
+      },
+    ])
+    .returning()
+
+  // Twee tickets op een testkoper, zodat "Mijn Tickets" na inloggen met dit
+  // e-mailadres meteen gevuld is (fase K).
+  const koperEmail = 'koper@example.com'
+  await db.insert(tickets).values(
+    [1, 2].map(() => {
+      const ticketId = randomUUID()
+      return {
+        id: ticketId,
+        event_id: event.id,
+        ticket_type_id: regulier.id,
+        organization_id: organisatie.id,
+        code: signTicket(event.id, ticketId),
+        koper_naam: 'Test Koper',
+        koper_email: koperEmail,
+        verkocht_op: new Date(),
+        verkoopkanaal: 'seed',
+      }
+    }),
+  )
 
   await db.insert(eventSprekers).values([
     { event_id: event.id, organization_id: organisatie.id, naam: 'Elena Fisher', rol: 'Head of AI at Google', volgorde: '0' },
@@ -103,6 +129,7 @@ async function seed() {
   console.log(`  organisatie: ${organisatie.naam} (${organisatie.id})`)
   console.log(`  event:       ${event.naam} (${event.id}) — status actief`)
   console.log('  tickettypes: Regulier, VIP · sprekers/agenda/FAQ toegevoegd')
+  console.log(`  testkoper:   ${koperEmail} (2 tickets) — log hiermee in op /mijn-ticket`)
 }
 
 seed()

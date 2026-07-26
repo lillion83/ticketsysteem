@@ -4,6 +4,7 @@ import { and, desc, eq, sql } from 'drizzle-orm'
 import { db } from '#/db/index'
 import { events, reserveringen, ticketTypes, tickets } from '#/db/schema'
 import { requireAuth } from '#/server/session'
+import { vindKoperUserId } from '#/server/mijnTickets'
 import { signTicket } from '#/lib/ticketcode'
 
 // Reserveringsbrug (fase G). Een bezoeker vraagt publiek een ticket aan; de
@@ -135,6 +136,8 @@ export const verwerkReservering = createServerFn({ method: 'POST' })
         throw new Error('Niet genoeg voorraad voor deze reservering')
       }
 
+      // Koppel aan een bestaand koper-account (fase K) als dat er is.
+      const koperUserId = res.email ? await vindKoperUserId(res.email) : null
       const nieuweTickets = Array.from({ length: aantal }, () => {
         const ticketId = randomUUID()
         return {
@@ -146,6 +149,7 @@ export const verwerkReservering = createServerFn({ method: 'POST' })
           koper_naam: res.naam,
           koper_telefoon: res.telefoon,
           koper_email: res.email,
+          koper_user_id: koperUserId,
           verkocht_op: new Date(),
           verkocht_door_user_id: userId,
           verkoopkanaal: 'reservering',
