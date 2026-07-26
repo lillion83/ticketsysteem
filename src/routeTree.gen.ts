@@ -13,6 +13,9 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminRouteRouteImport } from './routes/admin/route'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
+import { Route as EventsIndexRouteImport } from './routes/events.index'
+import { Route as EventsEventIdRouteImport } from './routes/events.$eventId'
+import { Route as EventsNewRouteImport } from './routes/events.new'
 import { Route as STokenRouteImport } from './routes/s.$token'
 import { Route as ScanEventIdRouteImport } from './routes/scan.$eventId'
 import { Route as TCodeRouteImport } from './routes/t.$code'
@@ -40,6 +43,21 @@ const AdminIndexRoute = AdminIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => AdminRouteRoute,
+} as any)
+const EventsIndexRoute = EventsIndexRouteImport.update({
+  id: '/events/',
+  path: '/events/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EventsEventIdRoute = EventsEventIdRouteImport.update({
+  id: '/events/$eventId',
+  path: '/events/$eventId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EventsNewRoute = EventsNewRouteImport.update({
+  id: '/events/new',
+  path: '/events/new',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const STokenRoute = STokenRouteImport.update({
   id: '/s/$token',
@@ -81,10 +99,13 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteRouteWithChildren
   '/login': typeof LoginRoute
+  '/events/$eventId': typeof EventsEventIdRoute
+  '/events/new': typeof EventsNewRoute
   '/s/$token': typeof STokenRoute
   '/scan/$eventId': typeof ScanEventIdRoute
   '/t/$code': typeof TCodeRoute
   '/admin/': typeof AdminIndexRoute
+  '/events/': typeof EventsIndexRoute
   '/admin/events/$eventId': typeof AdminEventsEventIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/t/$code/qr': typeof TCodeQrRoute
@@ -93,10 +114,13 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/events/$eventId': typeof EventsEventIdRoute
+  '/events/new': typeof EventsNewRoute
   '/s/$token': typeof STokenRoute
   '/scan/$eventId': typeof ScanEventIdRoute
   '/t/$code': typeof TCodeRoute
   '/admin': typeof AdminIndexRoute
+  '/events': typeof EventsIndexRoute
   '/admin/events/$eventId': typeof AdminEventsEventIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/t/$code/qr': typeof TCodeQrRoute
@@ -107,10 +131,13 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteRouteWithChildren
   '/login': typeof LoginRoute
+  '/events/$eventId': typeof EventsEventIdRoute
+  '/events/new': typeof EventsNewRoute
   '/s/$token': typeof STokenRoute
   '/scan/$eventId': typeof ScanEventIdRoute
   '/t/$code': typeof TCodeRoute
   '/admin/': typeof AdminIndexRoute
+  '/events/': typeof EventsIndexRoute
   '/admin/events/$eventId': typeof AdminEventsEventIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/t/$code_/qr': typeof TCodeQrRoute
@@ -122,10 +149,13 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/login'
+    | '/events/$eventId'
+    | '/events/new'
     | '/s/$token'
     | '/scan/$eventId'
     | '/t/$code'
     | '/admin/'
+    | '/events/'
     | '/admin/events/$eventId'
     | '/api/auth/$'
     | '/t/$code/qr'
@@ -134,10 +164,13 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/login'
+    | '/events/$eventId'
+    | '/events/new'
     | '/s/$token'
     | '/scan/$eventId'
     | '/t/$code'
     | '/admin'
+    | '/events'
     | '/admin/events/$eventId'
     | '/api/auth/$'
     | '/t/$code/qr'
@@ -147,10 +180,13 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/login'
+    | '/events/$eventId'
+    | '/events/new'
     | '/s/$token'
     | '/scan/$eventId'
     | '/t/$code'
     | '/admin/'
+    | '/events/'
     | '/admin/events/$eventId'
     | '/api/auth/$'
     | '/t/$code_/qr'
@@ -161,9 +197,12 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRouteRoute: typeof AdminRouteRouteWithChildren
   LoginRoute: typeof LoginRoute
+  EventsEventIdRoute: typeof EventsEventIdRoute
+  EventsNewRoute: typeof EventsNewRoute
   STokenRoute: typeof STokenRoute
   ScanEventIdRoute: typeof ScanEventIdRoute
   TCodeRoute: typeof TCodeRoute
+  EventsIndexRoute: typeof EventsIndexRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   TCodeQrRoute: typeof TCodeQrRoute
 }
@@ -197,6 +236,27 @@ declare module '@tanstack/react-router' {
       fullPath: '/admin/'
       preLoaderRoute: typeof AdminIndexRouteImport
       parentRoute: typeof AdminRouteRoute
+    }
+    '/events/': {
+      id: '/events/'
+      path: '/events'
+      fullPath: '/events/'
+      preLoaderRoute: typeof EventsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/events/$eventId': {
+      id: '/events/$eventId'
+      path: '/events/$eventId'
+      fullPath: '/events/$eventId'
+      preLoaderRoute: typeof EventsEventIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/events/new': {
+      id: '/events/new'
+      path: '/events/new'
+      fullPath: '/events/new'
+      preLoaderRoute: typeof EventsNewRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/s/$token': {
       id: '/s/$token'
@@ -270,9 +330,12 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRouteRoute: AdminRouteRouteWithChildren,
   LoginRoute: LoginRoute,
+  EventsEventIdRoute: EventsEventIdRoute,
+  EventsNewRoute: EventsNewRoute,
   STokenRoute: STokenRoute,
   ScanEventIdRoute: ScanEventIdRoute,
   TCodeRoute: TCodeRoute,
+  EventsIndexRoute: EventsIndexRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   TCodeQrRoute: TCodeQrRoute,
 }
