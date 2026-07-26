@@ -1,11 +1,22 @@
-import { createFileRoute, Link } from '@tanstack/react-router'
+import { createFileRoute, Link, redirect, useNavigate } from '@tanstack/react-router'
 import { useState } from 'react'
 import { SiteNav, SitePage, stripe } from '#/components/discovery/site'
+import { createFullEvent } from '#/server/events'
+import type { FullEventInput } from '#/server/events'
+import { getCurrentUser } from '#/server/session'
 
 // Organiseer een Event — 3-staps flow (ontwerp: OrganiseerEvent.dc.html).
-// Volledig client-side formulierstate; verzend naar een server function à la
-// `src/server/events.ts` zodra het publieke create-event-model is afgesproken.
-export const Route = createFileRoute('/events/new')({ component: OrganiseerEvent })
+// Client-side formulierstate; "Publiceer Event" / "Opslaan als Concept"
+// verzenden naar createFullEvent. Publiceren maakt een org-gescoopt event aan
+// en vereist login: niet-ingelogde bezoekers gaan eerst naar /login en keren
+// daarna hierheen terug.
+export const Route = createFileRoute('/events/new')({
+  beforeLoad: async () => {
+    const user = await getCurrentUser()
+    if (!user) throw redirect({ to: '/login', search: { redirect: '/events/new' } })
+  },
+  component: OrganiseerEvent,
+})
 
 const categoryOptions = ['Muziek', 'Tech', 'Business', 'Food & Drink', 'Health', 'Art & Design', 'Sports']
 const rolesByCategory: Record<string, Array<string>> = {
@@ -39,7 +50,10 @@ function initials(name: string): string {
 }
 
 function OrganiseerEvent() {
+  const navigate = useNavigate()
   const [step, setStep] = useState<1 | 2 | 3>(1)
+  const [bezig, setBezig] = useState(false)
+  const [fout, setFout] = useState<string | null>(null)
   const [form, setForm] = useState({
     title: 'Global AI & Big Data Expo 2026',
     category: 'Muziek',
@@ -88,6 +102,56 @@ function OrganiseerEvent() {
   const isMusic = form.category === 'Muziek'
   const roles = rolesByCategory[form.category] ?? defaultRoles
   const lineupSectionLabel = form.category === 'Business' ? 'Spreker/Panel' : 'Line-up'
+
+  // Combineert een datum- en tijd-invoer tot een ISO-string in de lokale tijd
+  // van de organisator (zelfde aanpak als het admin-formulier).
+  function combineerISO(datum: string, tijd: string): string {
+    return new Date(`${datum}T${tijd || '00:00'}`).toISOString()
+  }
+
+  async function verzenden(status: 'actief' | 'concept') {
+    setFout(null)
+    if (!form.title.trim()) {
+      setFout('Titel is verplicht')
+      setStep(1)
+      return
+    }
+    if (!form.dateStart || !form.dateEnd) {
+      setFout('Start- en einddatum zijn verplicht')
+      setStep(1)
+      return
+    }
+    const payload: FullEventInput = {
+      naam: form.title,
+      categorie: (categoryOptions.includes(form.category) ? form.category : null) as FullEventInput['categorie'],
+      beschrijving: form.description || null,
+      datum_start: combineerISO(form.dateStart, form.timeStart),
+      datum_eind: combineerISO(form.dateEnd, form.timeEnd),
+      locatie: form.location || null,
+      status,
+      tiers: tiers.map((t) => ({
+        naam: t.name,
+        prijs_srd: String(t.priceSRD),
+        aantal_beschikbaar: String(t.qty),
+      })),
+      sprekers: lineup.map((l) => ({ naam: l.name, rol: l.role })),
+    }
+    setBezig(true)
+    try {
+      const res = await createFullEvent({ data: payload })
+      // Gepubliceerd → naar de publieke detailpagina; concept → naar admin om
+      // verder te bewerken (concepten zijn niet publiek zichtbaar).
+      if (res.status === 'actief') {
+        navigate({ to: '/events/$eventId', params: { eventId: res.id } })
+      } else {
+        navigate({ to: '/admin/events/$eventId', params: { eventId: res.id } })
+      }
+    } catch (err) {
+      setFout(err instanceof Error ? err.message : 'Opslaan mislukt')
+    } finally {
+      setBezig(false)
+    }
+  }
 
   function updateField<TKey extends keyof typeof form>(field: TKey, value: (typeof form)[TKey]) {
     setForm((f) => ({ ...f, [field]: value }))
@@ -512,11 +576,18 @@ function OrganiseerEvent() {
               </div>
             </div>
 
+            {fout && <p className="mb-4 text-[14px] font-semibold text-[#EF4444]">{fout}</p>}
             <div className="flex flex-col justify-between gap-3 sm:flex-row">
-              <SecondaryButton onClick={() => setStep(2)}>← Vorige</SecondaryButton>
+              <SecondaryButton onClick={() => setStep(2)} disabled={bezig}>
+                ← Vorige
+              </SecondaryButton>
               <div className="flex gap-3">
-                <SecondaryButton onClick={() => {}}>Opslaan als Concept</SecondaryButton>
-                <PrimaryButton onClick={() => {}}>Publiceer Event</PrimaryButton>
+                <SecondaryButton onClick={() => void verzenden('concept')} disabled={bezig}>
+                  {bezig ? 'Bezig…' : 'Opslaan als Concept'}
+                </SecondaryButton>
+                <PrimaryButton onClick={() => void verzenden('actief')} disabled={bezig}>
+                  {bezig ? 'Bezig…' : 'Publiceer Event'}
+                </PrimaryButton>
               </div>
             </div>
           </div>
@@ -584,22 +655,40 @@ function SmallInput({
   )
 }
 
-function PrimaryButton({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {
+function PrimaryButton({
+  onClick,
+  children,
+  disabled,
+}: {
+  onClick: () => void
+  children: React.ReactNode
+  disabled?: boolean
+}) {
   return (
     <button
       onClick={onClick}
-      className="rounded-full bg-[#2563EB] px-7 py-3 text-[14.5px] font-bold text-white hover:bg-[#1D4ED8]"
+      disabled={disabled}
+      className="rounded-full bg-[#2563EB] px-7 py-3 text-[14.5px] font-bold text-white hover:bg-[#1D4ED8] disabled:opacity-50"
     >
       {children}
     </button>
   )
 }
 
-function SecondaryButton({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {
+function SecondaryButton({
+  onClick,
+  children,
+  disabled,
+}: {
+  onClick: () => void
+  children: React.ReactNode
+  disabled?: boolean
+}) {
   return (
     <button
       onClick={onClick}
-      className="rounded-full border border-[#E5E7EB] bg-white px-6 py-3 text-[14.5px] font-bold text-[#0F172A] hover:border-[#CBD5E1]"
+      disabled={disabled}
+      className="rounded-full border border-[#E5E7EB] bg-white px-6 py-3 text-[14.5px] font-bold text-[#0F172A] hover:border-[#CBD5E1] disabled:opacity-50"
     >
       {children}
     </button>

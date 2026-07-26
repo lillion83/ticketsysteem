@@ -2,7 +2,13 @@ import { createFileRoute, useNavigate, useRouter } from '@tanstack/react-router'
 import { useState } from 'react'
 import { signIn } from '#/lib/auth-client'
 
-export const Route = createFileRoute('/login')({ component: LoginPage })
+export const Route = createFileRoute('/login')({
+  // Optioneel pad om na inloggen naar terug te keren (bv. de organiseer-flow).
+  validateSearch: (search: Record<string, unknown>): { redirect?: string } => ({
+    redirect: typeof search.redirect === 'string' ? search.redirect : undefined,
+  }),
+  component: LoginPage,
+})
 
 /**
  * Vertaalt de foutcode van Better Auth. Een verkeerd wachtwoord en een
@@ -24,6 +30,7 @@ function foutTekst(code: string | undefined): string {
 function LoginPage() {
   const navigate = useNavigate()
   const router = useRouter()
+  const { redirect } = Route.useSearch()
   const [email, setEmail] = useState('')
   const [wachtwoord, setWachtwoord] = useState('')
   const [fout, setFout] = useState<string | null>(null)
@@ -43,7 +50,8 @@ function LoginPage() {
     // dat oordeel vast. Zonder invalidate draait beforeLoad niet opnieuw en
     // stuurt /admin je terug naar /login, hoe geldig de nieuwe sessie ook is.
     await router.invalidate()
-    navigate({ to: '/admin' })
+    // Keer terug naar de pagina die om login vroeg, anders naar de admin.
+    navigate({ to: redirect ?? '/admin' })
   }
 
   return (
