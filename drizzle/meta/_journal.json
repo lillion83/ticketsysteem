@@ -29,6 +29,13 @@
       "when": 1785097796096,
       "tag": "0003_warm_bloodstrike",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1785098906537,
+      "tag": "0004_sudden_micromax",
+      "breakpoints": true
     }
   ]
 }

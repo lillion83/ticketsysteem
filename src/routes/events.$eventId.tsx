@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { SiteFooter, SiteNav, SitePage, coverStyle, stripe } from '#/components/discovery/site'
-import { formatMoney, useCurrency } from '#/components/discovery/currency'
+import { formatPrice, useCurrency } from '#/components/discovery/currency'
 import { getPublicEvent } from '#/server/discovery'
 
 // Event-detailpagina (ontwerp: EventDetail.dc.html), gevoed door de database.
@@ -120,7 +120,7 @@ function EventDetailPage() {
                       <div className="mb-2 flex items-start justify-between gap-4">
                         <div className="text-[16px] font-extrabold">{t.naam}</div>
                         <div className="whitespace-nowrap text-[16px] font-extrabold text-[#2563EB]">
-                          {formatMoney(t.prijsSrd, t.prijsUsd, currency)}
+                          {formatPrice(t.prijsSrd, currency)}
                         </div>
                       </div>
                       {t.features.length > 0 && (
@@ -187,9 +187,7 @@ function EventDetailPage() {
               </div>
               <div className="mb-0.5 text-[13px] text-[#64748B]">Vanaf</div>
               <div className="mb-4 text-[22px] font-extrabold text-[#2563EB]">
-                {detail.prijsVanafSrd === null
-                  ? 'Gratis'
-                  : formatMoney(detail.prijsVanafSrd, detail.prijsVanafUsd, currency)}
+                {detail.prijsVanafSrd === null ? 'Gratis' : formatPrice(detail.prijsVanafSrd, currency)}
               </div>
               {/* Registreer Nu → wire aan het bestaande checkout-/ticketflow zodra
                   dat publiek beschikbaar is (nu nog placeholder). */}

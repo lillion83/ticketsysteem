@@ -12,7 +12,7 @@ import {
   stripe,
 } from '#/components/discovery/site'
 import { categories } from '#/components/discovery/data'
-import { formatMoney, useCurrency } from '#/components/discovery/currency'
+import { formatPrice, useCurrency } from '#/components/discovery/currency'
 import { listPublicEvents } from '#/server/discovery'
 
 // Homepage van de publieke discovery-front-end (ontwerp: Homepage.dc.html).
@@ -22,12 +22,8 @@ export const Route = createFileRoute('/')({
   component: Home,
 })
 
-function prijsLabel(
-  prijsVanafSrd: number | null,
-  prijsVanafUsd: number | null,
-  currency: ReturnType<typeof useCurrency>,
-): string {
-  return prijsVanafSrd === null ? 'Gratis' : formatMoney(prijsVanafSrd, prijsVanafUsd, currency)
+function prijsLabel(prijsVanafSrd: number | null, currency: ReturnType<typeof useCurrency>): string {
+  return prijsVanafSrd === null ? 'Gratis' : formatPrice(prijsVanafSrd, currency)
 }
 
 function Home() {
@@ -182,7 +178,7 @@ function Home() {
                     </div>
                     <div className="flex items-center justify-between">
                       <div className="text-[15px] font-extrabold text-[#2563EB]">
-                        {prijsLabel(ev.prijsVanafSrd, ev.prijsVanafUsd, currency)}
+                        {prijsLabel(ev.prijsVanafSrd, currency)}
                       </div>
                       <span className="rounded-full bg-[#2563EB] px-[18px] py-2 text-[13px] font-bold text-white">
                         Details
@@ -232,7 +228,7 @@ function Home() {
                 </div>
                 <div className="flex-none text-right">
                   <div className="mb-2 text-[15px] font-extrabold text-[#2563EB]">
-                    {prijsLabel(ev.prijsVanafSrd, ev.prijsVanafUsd, currency)}
+                    {prijsLabel(ev.prijsVanafSrd, currency)}
                   </div>
                   <Link
                     to="/events/$eventId"

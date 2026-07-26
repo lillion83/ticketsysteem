@@ -32,7 +32,6 @@ type Tier = {
   name: string
   desc: string
   priceSRD: number
-  priceUSD: number
   qty: number
   features: Array<string>
   earlyBird: boolean
@@ -77,7 +76,6 @@ function OrganiseerEvent() {
       name: 'General Admission',
       desc: 'Standaard toegang tot alle sessies',
       priceSRD: 500,
-      priceUSD: 14,
       qty: 200,
       features: ['Volledige 3-daagse toegang', 'Toegang tot event-app'],
       earlyBird: true,
@@ -89,7 +87,6 @@ function OrganiseerEvent() {
       name: 'VIP Access Pass',
       desc: "De ultieme ervaring met exclusieve extra's",
       priceSRD: 1500,
-      priceUSD: 42,
       qty: 50,
       features: ['Alles in General Admission', 'VIP Lounge toegang'],
       earlyBird: false,
@@ -132,7 +129,6 @@ function OrganiseerEvent() {
       tiers: tiers.map((t) => ({
         naam: t.name,
         prijs_srd: String(t.priceSRD),
-        prijs_usd: t.priceUSD ? String(t.priceUSD) : null,
         aantal_beschikbaar: String(t.qty),
         features: t.features,
       })),
@@ -178,7 +174,6 @@ function OrganiseerEvent() {
         name: 'Nieuwe Tier',
         desc: '',
         priceSRD: 0,
-        priceUSD: 0,
         qty: 100,
         features: [],
         earlyBird: false,
@@ -419,13 +414,6 @@ function OrganiseerEvent() {
                         onChange={(v) => updateTier(t.id, 'priceSRD', Number(v))}
                       />
                     </SmallField>
-                    <SmallField label="Prijs USD">
-                      <SmallInput
-                        type="number"
-                        value={String(t.priceUSD)}
-                        onChange={(v) => updateTier(t.id, 'priceUSD', Number(v))}
-                      />
-                    </SmallField>
                   </div>
                   <div className="mb-3.5">
                     <label className="mb-2 block text-[12.5px] font-bold">Features</label>
@@ -571,7 +559,7 @@ function OrganiseerEvent() {
                       <div className="text-[12.5px] text-[#64748B]">{t.qty} beschikbaar</div>
                     </div>
                     <div className="font-extrabold text-[#2563EB]">
-                      SRD {t.priceSRD} / ${t.priceUSD}
+                      SRD {t.priceSRD}
                     </div>
                   </div>
                 ))}

@@ -564,7 +564,6 @@ type TypeInitial = {
   id: string
   naam: string
   prijs_srd: string
-  prijs_usd: string | null
   inkoopprijs_srd: string
   aantal_beschikbaar: string
   features: Array<string> | null
@@ -581,7 +580,6 @@ function TypeForm({
 }) {
   const [naam, setNaam] = useState(initial?.naam ?? '')
   const [prijs, setPrijs] = useState(initial?.prijs_srd ?? '')
-  const [prijsUsd, setPrijsUsd] = useState(initial?.prijs_usd ?? '')
   const [inkoop, setInkoop] = useState(initial?.inkoopprijs_srd ?? '')
   const [aantal, setAantal] = useState(initial?.aantal_beschikbaar ?? '')
   // Features: één per regel in de textarea.
@@ -596,7 +594,6 @@ function TypeForm({
         event_id: eventId,
         naam,
         prijs_srd: prijs,
-        prijs_usd: prijsUsd,
         inkoopprijs_srd: inkoop,
         aantal_beschikbaar: aantal,
         features: features.split('\n'),
@@ -614,7 +611,7 @@ function TypeForm({
 
   return (
     <form onSubmit={opslaan} className="flex flex-col gap-2">
-      <div className="grid grid-cols-2 items-end gap-2 sm:grid-cols-5">
+      <div className="grid grid-cols-2 items-end gap-2 sm:grid-cols-4">
         <label className="flex flex-col gap-1">
           <span className="text-xs font-medium">Naam</span>
           <input
@@ -630,15 +627,6 @@ function TypeForm({
             required
             value={prijs}
             onChange={(e) => setPrijs(e.target.value)}
-            className="rounded border border-gray-300 px-2 py-1"
-          />
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className="text-xs font-medium">Prijs (USD)</span>
-          <input
-            value={prijsUsd}
-            onChange={(e) => setPrijsUsd(e.target.value)}
-            placeholder="optioneel"
             className="rounded border border-gray-300 px-2 py-1"
           />
         </label>

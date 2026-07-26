@@ -38,22 +38,14 @@ export function useCurrency(): Currency {
   return useSyncExternalStore(subscribe, readStored, () => 'SRD')
 }
 
-/** Formatteert een SRD-bedrag in de gekozen valuta, bv. "SRD 500" of "$14". */
+/**
+ * Formatteert een SRD-bedrag in de gekozen valuta, bv. "SRD 500" of "$14".
+ * SRD is de enige opgeslagen prijs; USD is altijd een omrekening.
+ */
 export function formatPrice(bedragSrd: number, valuta: Currency): string {
   if (valuta === 'USD') {
     const usd = Math.round(bedragSrd / SRD_PER_USD)
     return `$${usd.toLocaleString('en-US')}`
   }
   return `SRD ${bedragSrd.toLocaleString('nl-NL')}`
-}
-
-/**
- * Formatteert een prijs met een optionele expliciete USD-waarde. Bij USD-weergave
- * wint de opgegeven `bedragUsd` als die er is; anders rekenen we om vanaf SRD.
- */
-export function formatMoney(bedragSrd: number, bedragUsd: number | null, valuta: Currency): string {
-  if (valuta === 'USD' && bedragUsd !== null) {
-    return `$${bedragUsd.toLocaleString('en-US')}`
-  }
-  return formatPrice(bedragSrd, valuta)
 }

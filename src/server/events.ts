@@ -94,13 +94,7 @@ export type FullEventInput = {
   datum_eind: string
   locatie: string | null
   status: 'concept' | 'actief'
-  tiers: Array<{
-    naam: string
-    prijs_srd: string
-    prijs_usd: string | null
-    aantal_beschikbaar: string
-    features: Array<string>
-  }>
+  tiers: Array<{ naam: string; prijs_srd: string; aantal_beschikbaar: string; features: Array<string> }>
   sprekers: Array<{ naam: string; rol: string | null }>
 }
 
@@ -126,10 +120,6 @@ function parseFullEventInput(data: FullEventInput): FullEventInput {
       if (waarde === '' || Number.isNaN(Number(waarde)) || Number(waarde) < 0) {
         throw new Error(`Ongeldige waarde voor ${veld} bij tier "${t.naam}"`)
       }
-    }
-    // USD-prijs is optioneel, maar als hij er is moet hij geldig zijn.
-    if (t.prijs_usd !== null && t.prijs_usd !== '' && (Number.isNaN(Number(t.prijs_usd)) || Number(t.prijs_usd) < 0)) {
-      throw new Error(`Ongeldige USD-prijs bij tier "${t.naam}"`)
     }
   }
   return { ...data, tiers, sprekers: data.sprekers.filter((s) => s.naam.trim()) }
@@ -162,7 +152,6 @@ export const createFullEvent = createServerFn({ method: 'POST' })
             organization_id: organizationId,
             naam: t.naam.trim(),
             prijs_srd: t.prijs_srd,
-            prijs_usd: t.prijs_usd && t.prijs_usd.trim() ? t.prijs_usd.trim() : null,
             inkoopprijs_srd: '0',
             aantal_beschikbaar: t.aantal_beschikbaar,
             features: t.features.map((f) => f.trim()).filter(Boolean),

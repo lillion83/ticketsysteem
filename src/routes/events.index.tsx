@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { PinIcon, SiteFooter, SiteNav, SitePage, coverStyle } from '#/components/discovery/site'
 import { dateFilters, eventCategories } from '#/components/discovery/data'
-import { formatMoney, useCurrency } from '#/components/discovery/currency'
+import { formatPrice, useCurrency } from '#/components/discovery/currency'
 import { listPublicEvents } from '#/server/discovery'
 
 type SortOrder = 'relevantie' | 'prijs' | 'datum'
@@ -210,9 +210,7 @@ function EventsOverzicht() {
                     </div>
                     <div className="flex items-center justify-between border-t border-[#F1F5F9] pt-3">
                       <span className="text-[13.5px] font-extrabold text-[#2563EB]">
-                        {ev.prijsVanafSrd === null
-                          ? 'Gratis'
-                          : formatMoney(ev.prijsVanafSrd, ev.prijsVanafUsd, currency)}
+                        {ev.prijsVanafSrd === null ? 'Gratis' : formatPrice(ev.prijsVanafSrd, currency)}
                       </span>
                       <span className="text-[12px] text-[#94A3B8]">{ev.aanmeldingen} aanmeldingen</span>
                     </div>
