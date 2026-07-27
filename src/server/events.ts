@@ -3,6 +3,7 @@ import { and, desc, eq } from 'drizzle-orm'
 import { db } from '#/db/index'
 import { eventCategorie, eventSprekers, events, ticketTypes } from '#/db/schema'
 import { requireAuth } from '#/server/session'
+import { requireContentAccess } from '#/server/scope'
 
 type Categorie = (typeof eventCategorie.enumValues)[number]
 
@@ -20,7 +21,7 @@ export const listEvents = createServerFn({ method: 'GET' }).handler(async () => 
 export const getEvent = createServerFn({ method: 'GET' })
   .validator((eventId: string) => eventId)
   .handler(async ({ data: eventId }) => {
-    const { organizationId } = await requireAuth()
+    const { organizationId } = await requireContentAccess(eventId)
     const rows = await db
       .select()
       .from(events)
@@ -182,7 +183,7 @@ export const updateEvent = createServerFn({ method: 'POST' })
     return data
   })
   .handler(async ({ data }) => {
-    const { organizationId } = await requireAuth()
+    const { organizationId } = await requireContentAccess(data.id)
     const rows = await db
       .update(events)
       .set({

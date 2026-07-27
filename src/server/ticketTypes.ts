@@ -1,24 +1,13 @@
 import { createServerFn } from '@tanstack/react-start'
 import { and, eq } from 'drizzle-orm'
 import { db } from '#/db/index'
-import { events, ticketTypes } from '#/db/schema'
-import { requireAuth } from '#/server/session'
-
-async function assertEventInOrg(eventId: string, organizationId: string) {
-  const rows = await db
-    .select({ id: events.id })
-    .from(events)
-    .where(
-      and(eq(events.id, eventId), eq(events.organization_id, organizationId)),
-    )
-    .limit(1)
-  if (rows.length === 0) throw new Error('Event niet gevonden')
-}
+import { ticketTypes } from '#/db/schema'
+import { requireContentAccess } from '#/server/scope'
 
 export const listTicketTypes = createServerFn({ method: 'GET' })
   .validator((eventId: string) => eventId)
   .handler(async ({ data: eventId }) => {
-    const { organizationId } = await requireAuth()
+    const { organizationId } = await requireContentAccess(eventId)
     return db
       .select()
       .from(ticketTypes)
@@ -61,8 +50,7 @@ function cleanFeatures(features: Array<string>): Array<string> {
 export const createTicketType = createServerFn({ method: 'POST' })
   .validator(parseTicketTypeInput)
   .handler(async ({ data }) => {
-    const { organizationId } = await requireAuth()
-    await assertEventInOrg(data.event_id, organizationId)
+    const { organizationId } = await requireContentAccess(data.event_id)
     const [type] = await db
       .insert(ticketTypes)
       .values({
@@ -85,7 +73,7 @@ export const updateTicketType = createServerFn({ method: 'POST' })
     return data
   })
   .handler(async ({ data }) => {
-    const { organizationId } = await requireAuth()
+    const { organizationId } = await requireContentAccess(data.event_id)
     const rows = await db
       .update(ticketTypes)
       .set({

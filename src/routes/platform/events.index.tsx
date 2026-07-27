@@ -1,4 +1,4 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { Link, createFileRoute } from '@tanstack/react-router'
 import { listAllEvents } from '#/server/platform'
 
 export const Route = createFileRoute('/platform/events/')({
@@ -36,6 +36,7 @@ function AlleEvents() {
                 <th className="bg-[#F8FAFC] px-4 py-2.5 font-bold">Datum</th>
                 <th className="bg-[#F8FAFC] px-4 py-2.5 font-bold">Uitgegeven</th>
                 <th className="bg-[#F8FAFC] px-4 py-2.5 font-bold">Status</th>
+                <th className="rounded-r-[9px] bg-[#F8FAFC] px-4 py-2.5"></th>
               </tr>
             </thead>
             <tbody>
@@ -54,6 +55,15 @@ function AlleEvents() {
                     <span className={`rounded-full px-3 py-1 text-[12px] font-bold ${statusStijl[e.status] ?? statusStijl.concept}`}>
                       {e.status}
                     </span>
+                  </td>
+                  <td className="px-4 py-3.5 text-right">
+                    <Link
+                      to="/platform/events/$eventId"
+                      params={{ eventId: e.id }}
+                      className="text-[13px] font-semibold text-[#2563EB] hover:underline"
+                    >
+                      Bewerken →
+                    </Link>
                   </td>
                 </tr>
               ))}

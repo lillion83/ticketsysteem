@@ -1,28 +1,19 @@
 import { createServerFn } from '@tanstack/react-start'
 import { and, asc, eq } from 'drizzle-orm'
 import { db } from '#/db/index'
-import { eventAgenda, eventFaq, eventSprekers, events } from '#/db/schema'
-import { requireAuth } from '#/server/session'
+import { eventAgenda, eventFaq, eventSprekers } from '#/db/schema'
+import { orgWhere, requireContentAccess, sessieRol } from '#/server/scope'
 
-// Beheer van publieke event-inhoud (sprekers, agenda, FAQ) voor de admin.
-// Auth-gescoopt op organization_id (harde regel 3), gemodelleerd naar
-// src/server/ticketTypes.ts.
-
-async function assertEventInOrg(eventId: string, organizationId: string) {
-  const rows = await db
-    .select({ id: events.id })
-    .from(events)
-    .where(and(eq(events.id, eventId), eq(events.organization_id, organizationId)))
-    .limit(1)
-  if (rows.length === 0) throw new Error('Event niet gevonden')
-}
+// Beheer van publieke event-inhoud (sprekers, agenda, FAQ). Org-gescoopt voor
+// organisatoren; de admin mag cross-org bewerken (fase J), via
+// requireContentAccess / orgWhere.
 
 // --- Sprekers ---
 
 export const listSprekers = createServerFn({ method: 'GET' })
   .validator((eventId: string) => eventId)
   .handler(async ({ data: eventId }) => {
-    const { organizationId } = await requireAuth()
+    const { organizationId } = await requireContentAccess(eventId)
     return db
       .select()
       .from(eventSprekers)
@@ -36,8 +27,7 @@ export const createSpreker = createServerFn({ method: 'POST' })
     return data
   })
   .handler(async ({ data }) => {
-    const { organizationId } = await requireAuth()
-    await assertEventInOrg(data.event_id, organizationId)
+    const { organizationId } = await requireContentAccess(data.event_id)
     const bestaand = await db
       .select({ id: eventSprekers.id })
       .from(eventSprekers)
@@ -59,10 +49,10 @@ export const createSpreker = createServerFn({ method: 'POST' })
 export const deleteSpreker = createServerFn({ method: 'POST' })
   .validator((id: string) => id)
   .handler(async ({ data: id }) => {
-    const { organizationId } = await requireAuth()
+    const ctx = await sessieRol()
     await db
       .delete(eventSprekers)
-      .where(and(eq(eventSprekers.id, id), eq(eventSprekers.organization_id, organizationId)))
+      .where(and(eq(eventSprekers.id, id), orgWhere(eventSprekers.organization_id, ctx)))
     return { ok: true }
   })
 
@@ -71,7 +61,7 @@ export const deleteSpreker = createServerFn({ method: 'POST' })
 export const listAgenda = createServerFn({ method: 'GET' })
   .validator((eventId: string) => eventId)
   .handler(async ({ data: eventId }) => {
-    const { organizationId } = await requireAuth()
+    const { organizationId } = await requireContentAccess(eventId)
     return db
       .select()
       .from(eventAgenda)
@@ -86,8 +76,7 @@ export const createAgenda = createServerFn({ method: 'POST' })
     return data
   })
   .handler(async ({ data }) => {
-    const { organizationId } = await requireAuth()
-    await assertEventInOrg(data.event_id, organizationId)
+    const { organizationId } = await requireContentAccess(data.event_id)
     const bestaand = await db
       .select({ id: eventAgenda.id })
       .from(eventAgenda)
@@ -110,8 +99,8 @@ export const createAgenda = createServerFn({ method: 'POST' })
 export const deleteAgenda = createServerFn({ method: 'POST' })
   .validator((id: string) => id)
   .handler(async ({ data: id }) => {
-    const { organizationId } = await requireAuth()
-    await db.delete(eventAgenda).where(and(eq(eventAgenda.id, id), eq(eventAgenda.organization_id, organizationId)))
+    const ctx = await sessieRol()
+    await db.delete(eventAgenda).where(and(eq(eventAgenda.id, id), orgWhere(eventAgenda.organization_id, ctx)))
     return { ok: true }
   })
 
@@ -120,7 +109,7 @@ export const deleteAgenda = createServerFn({ method: 'POST' })
 export const listFaq = createServerFn({ method: 'GET' })
   .validator((eventId: string) => eventId)
   .handler(async ({ data: eventId }) => {
-    const { organizationId } = await requireAuth()
+    const { organizationId } = await requireContentAccess(eventId)
     return db
       .select()
       .from(eventFaq)
@@ -134,8 +123,7 @@ export const createFaq = createServerFn({ method: 'POST' })
     return data
   })
   .handler(async ({ data }) => {
-    const { organizationId } = await requireAuth()
-    await assertEventInOrg(data.event_id, organizationId)
+    const { organizationId } = await requireContentAccess(data.event_id)
     const bestaand = await db.select({ id: eventFaq.id }).from(eventFaq).where(eq(eventFaq.event_id, data.event_id))
     const [rij] = await db
       .insert(eventFaq)
@@ -153,7 +141,7 @@ export const createFaq = createServerFn({ method: 'POST' })
 export const deleteFaq = createServerFn({ method: 'POST' })
   .validator((id: string) => id)
   .handler(async ({ data: id }) => {
-    const { organizationId } = await requireAuth()
-    await db.delete(eventFaq).where(and(eq(eventFaq.id, id), eq(eventFaq.organization_id, organizationId)))
+    const ctx = await sessieRol()
+    await db.delete(eventFaq).where(and(eq(eventFaq.id, id), orgWhere(eventFaq.organization_id, ctx)))
     return { ok: true }
   })

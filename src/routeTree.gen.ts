@@ -28,6 +28,7 @@ import { Route as AdminEventsIndexRouteImport } from './routes/admin/events.inde
 import { Route as AdminEventsEventIdRouteImport } from './routes/admin/events.$eventId'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as PlatformEventsIndexRouteImport } from './routes/platform/events.index'
+import { Route as PlatformEventsEventIdRouteImport } from './routes/platform/events.$eventId'
 import { Route as TCodeQrRouteImport } from './routes/t.$code_.qr'
 import { Route as AdminEventsEventIdDeurRouteImport } from './routes/admin/events.$eventId_.deur'
 
@@ -126,6 +127,11 @@ const PlatformEventsIndexRoute = PlatformEventsIndexRouteImport.update({
   path: '/events/',
   getParentRoute: () => PlatformRouteRoute,
 } as any)
+const PlatformEventsEventIdRoute = PlatformEventsEventIdRouteImport.update({
+  id: '/events/$eventId',
+  path: '/events/$eventId',
+  getParentRoute: () => PlatformRouteRoute,
+} as any)
 const TCodeQrRoute = TCodeQrRouteImport.update({
   id: '/t/$code_/qr',
   path: '/t/$code/qr',
@@ -155,6 +161,7 @@ export interface FileRoutesByFullPath {
   '/platform/': typeof PlatformIndexRoute
   '/admin/events/$eventId': typeof AdminEventsEventIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/platform/events/$eventId': typeof PlatformEventsEventIdRoute
   '/t/$code/qr': typeof TCodeQrRoute
   '/admin/events/': typeof AdminEventsIndexRoute
   '/platform/events/': typeof PlatformEventsIndexRoute
@@ -176,6 +183,7 @@ export interface FileRoutesByTo {
   '/platform': typeof PlatformIndexRoute
   '/admin/events/$eventId': typeof AdminEventsEventIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/platform/events/$eventId': typeof PlatformEventsEventIdRoute
   '/t/$code/qr': typeof TCodeQrRoute
   '/admin/events': typeof AdminEventsIndexRoute
   '/platform/events': typeof PlatformEventsIndexRoute
@@ -200,6 +208,7 @@ export interface FileRoutesById {
   '/platform/': typeof PlatformIndexRoute
   '/admin/events/$eventId': typeof AdminEventsEventIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/platform/events/$eventId': typeof PlatformEventsEventIdRoute
   '/t/$code_/qr': typeof TCodeQrRoute
   '/admin/events/': typeof AdminEventsIndexRoute
   '/platform/events/': typeof PlatformEventsIndexRoute
@@ -225,6 +234,7 @@ export interface FileRouteTypes {
     | '/platform/'
     | '/admin/events/$eventId'
     | '/api/auth/$'
+    | '/platform/events/$eventId'
     | '/t/$code/qr'
     | '/admin/events/'
     | '/platform/events/'
@@ -246,6 +256,7 @@ export interface FileRouteTypes {
     | '/platform'
     | '/admin/events/$eventId'
     | '/api/auth/$'
+    | '/platform/events/$eventId'
     | '/t/$code/qr'
     | '/admin/events'
     | '/platform/events'
@@ -269,6 +280,7 @@ export interface FileRouteTypes {
     | '/platform/'
     | '/admin/events/$eventId'
     | '/api/auth/$'
+    | '/platform/events/$eventId'
     | '/t/$code_/qr'
     | '/admin/events/'
     | '/platform/events/'
@@ -428,6 +440,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PlatformEventsIndexRouteImport
       parentRoute: typeof PlatformRouteRoute
     }
+    '/platform/events/$eventId': {
+      id: '/platform/events/$eventId'
+      path: '/events/$eventId'
+      fullPath: '/platform/events/$eventId'
+      preLoaderRoute: typeof PlatformEventsEventIdRouteImport
+      parentRoute: typeof PlatformRouteRoute
+    }
     '/t/$code_/qr': {
       id: '/t/$code_/qr'
       path: '/t/$code/qr'
@@ -465,11 +484,13 @@ const AdminRouteRouteWithChildren = AdminRouteRoute._addFileChildren(
 
 interface PlatformRouteRouteChildren {
   PlatformIndexRoute: typeof PlatformIndexRoute
+  PlatformEventsEventIdRoute: typeof PlatformEventsEventIdRoute
   PlatformEventsIndexRoute: typeof PlatformEventsIndexRoute
 }
 
 const PlatformRouteRouteChildren: PlatformRouteRouteChildren = {
   PlatformIndexRoute: PlatformIndexRoute,
+  PlatformEventsEventIdRoute: PlatformEventsEventIdRoute,
   PlatformEventsIndexRoute: PlatformEventsIndexRoute,
 }
 
