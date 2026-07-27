@@ -20,6 +20,7 @@ import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as EventsIndexRouteImport } from './routes/events.index'
 import { Route as EventsEventIdRouteImport } from './routes/events.$eventId'
 import { Route as EventsNewRouteImport } from './routes/events.new'
+import { Route as MijnTicketEventIdRouteImport } from './routes/mijn-ticket.$eventId'
 import { Route as PlatformIndexRouteImport } from './routes/platform/index'
 import { Route as STokenRouteImport } from './routes/s.$token'
 import { Route as ScanEventIdRouteImport } from './routes/scan.$eventId'
@@ -87,6 +88,11 @@ const EventsNewRoute = EventsNewRouteImport.update({
   path: '/events/new',
   getParentRoute: () => rootRouteImport,
 } as any)
+const MijnTicketEventIdRoute = MijnTicketEventIdRouteImport.update({
+  id: '/$eventId',
+  path: '/$eventId',
+  getParentRoute: () => MijnTicketRoute,
+} as any)
 const PlatformIndexRoute = PlatformIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -148,11 +154,12 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AdminRouteRouteWithChildren
   '/platform': typeof PlatformRouteRouteWithChildren
   '/login': typeof LoginRoute
-  '/mijn-ticket': typeof MijnTicketRoute
+  '/mijn-ticket': typeof MijnTicketRouteWithChildren
   '/profiel': typeof ProfielRoute
   '/word-organisator': typeof WordOrganisatorRoute
   '/events/$eventId': typeof EventsEventIdRoute
   '/events/new': typeof EventsNewRoute
+  '/mijn-ticket/$eventId': typeof MijnTicketEventIdRoute
   '/s/$token': typeof STokenRoute
   '/scan/$eventId': typeof ScanEventIdRoute
   '/t/$code': typeof TCodeRoute
@@ -170,11 +177,12 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
-  '/mijn-ticket': typeof MijnTicketRoute
+  '/mijn-ticket': typeof MijnTicketRouteWithChildren
   '/profiel': typeof ProfielRoute
   '/word-organisator': typeof WordOrganisatorRoute
   '/events/$eventId': typeof EventsEventIdRoute
   '/events/new': typeof EventsNewRoute
+  '/mijn-ticket/$eventId': typeof MijnTicketEventIdRoute
   '/s/$token': typeof STokenRoute
   '/scan/$eventId': typeof ScanEventIdRoute
   '/t/$code': typeof TCodeRoute
@@ -195,11 +203,12 @@ export interface FileRoutesById {
   '/admin': typeof AdminRouteRouteWithChildren
   '/platform': typeof PlatformRouteRouteWithChildren
   '/login': typeof LoginRoute
-  '/mijn-ticket': typeof MijnTicketRoute
+  '/mijn-ticket': typeof MijnTicketRouteWithChildren
   '/profiel': typeof ProfielRoute
   '/word-organisator': typeof WordOrganisatorRoute
   '/events/$eventId': typeof EventsEventIdRoute
   '/events/new': typeof EventsNewRoute
+  '/mijn-ticket/$eventId': typeof MijnTicketEventIdRoute
   '/s/$token': typeof STokenRoute
   '/scan/$eventId': typeof ScanEventIdRoute
   '/t/$code': typeof TCodeRoute
@@ -226,6 +235,7 @@ export interface FileRouteTypes {
     | '/word-organisator'
     | '/events/$eventId'
     | '/events/new'
+    | '/mijn-ticket/$eventId'
     | '/s/$token'
     | '/scan/$eventId'
     | '/t/$code'
@@ -248,6 +258,7 @@ export interface FileRouteTypes {
     | '/word-organisator'
     | '/events/$eventId'
     | '/events/new'
+    | '/mijn-ticket/$eventId'
     | '/s/$token'
     | '/scan/$eventId'
     | '/t/$code'
@@ -272,6 +283,7 @@ export interface FileRouteTypes {
     | '/word-organisator'
     | '/events/$eventId'
     | '/events/new'
+    | '/mijn-ticket/$eventId'
     | '/s/$token'
     | '/scan/$eventId'
     | '/t/$code'
@@ -292,7 +304,7 @@ export interface RootRouteChildren {
   AdminRouteRoute: typeof AdminRouteRouteWithChildren
   PlatformRouteRoute: typeof PlatformRouteRouteWithChildren
   LoginRoute: typeof LoginRoute
-  MijnTicketRoute: typeof MijnTicketRoute
+  MijnTicketRoute: typeof MijnTicketRouteWithChildren
   ProfielRoute: typeof ProfielRoute
   WordOrganisatorRoute: typeof WordOrganisatorRoute
   EventsEventIdRoute: typeof EventsEventIdRoute
@@ -383,6 +395,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/events/new'
       preLoaderRoute: typeof EventsNewRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/mijn-ticket/$eventId': {
+      id: '/mijn-ticket/$eventId'
+      path: '/$eventId'
+      fullPath: '/mijn-ticket/$eventId'
+      preLoaderRoute: typeof MijnTicketEventIdRouteImport
+      parentRoute: typeof MijnTicketRoute
     }
     '/platform/': {
       id: '/platform/'
@@ -498,12 +517,24 @@ const PlatformRouteRouteWithChildren = PlatformRouteRoute._addFileChildren(
   PlatformRouteRouteChildren,
 )
 
+interface MijnTicketRouteChildren {
+  MijnTicketEventIdRoute: typeof MijnTicketEventIdRoute
+}
+
+const MijnTicketRouteChildren: MijnTicketRouteChildren = {
+  MijnTicketEventIdRoute: MijnTicketEventIdRoute,
+}
+
+const MijnTicketRouteWithChildren = MijnTicketRoute._addFileChildren(
+  MijnTicketRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRouteRoute: AdminRouteRouteWithChildren,
   PlatformRouteRoute: PlatformRouteRouteWithChildren,
   LoginRoute: LoginRoute,
-  MijnTicketRoute: MijnTicketRoute,
+  MijnTicketRoute: MijnTicketRouteWithChildren,
   ProfielRoute: ProfielRoute,
   WordOrganisatorRoute: WordOrganisatorRoute,
   EventsEventIdRoute: EventsEventIdRoute,

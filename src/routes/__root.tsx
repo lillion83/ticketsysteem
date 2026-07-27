@@ -4,8 +4,13 @@ import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
 import { TanStackDevtools } from '@tanstack/react-devtools'
 
 import appCss from '../styles.css?url'
+import { getCurrentUser } from '#/server/session'
 
 export const Route = createRootRoute({
+  // Sessie één keer centraal laden: de publieke header (SiteNav) leest hieruit
+  // of er iemand is ingelogd en welke rol. Login/logout roepen router.invalidate()
+  // aan, waardoor deze loader herlaadt en de header vanzelf ververst.
+  loader: async () => ({ user: await getCurrentUser() }),
   head: () => ({
     meta: [
       {

@@ -12,9 +12,12 @@ export type MijnTicketStatus = 'geldig' | 'gebruikt' | 'ingetrokken'
 
 export type MijnTicket = {
   code: string
+  event_id: string
   event_naam: string
   datum_start: Date
   locatie: string | null
+  categorie: string | null
+  cover: string | null
   type_naam: string
   status: MijnTicketStatus
   gebruikt_op: Date | null
@@ -25,48 +28,67 @@ export type MijnTicket = {
  * (leest de user-tabel): dit wordt vanuit uitgifte-serverfuncties aangeroepen en
  * mag nooit in de client-bundel belanden — vgl. `laadPublicTicket`.
  */
-export const vindKoperUserId = createServerOnlyFn(async (email: string): Promise<string | null> => {
-  const rows = await db
-    .select({ id: user.id })
-    .from(user)
-    .where(sql`lower(${user.email}) = lower(${email})`)
-    .limit(1)
-  return rows[0]?.id ?? null
-})
+export const vindKoperUserId = createServerOnlyFn(
+  async (email: string): Promise<string | null> => {
+    const rows = await db
+      .select({ id: user.id })
+      .from(user)
+      .where(sql`lower(${user.email}) = lower(${email})`)
+      .limit(1)
+    return rows[0]?.id ?? null
+  },
+)
 
-export const listMijnTickets = createServerFn({ method: 'GET' }).handler(async (): Promise<Array<MijnTicket>> => {
-  const { userId, email } = await requireUser()
+export const listMijnTickets = createServerFn({ method: 'GET' }).handler(
+  async (): Promise<Array<MijnTicket>> => {
+    const { userId, email } = await requireUser()
 
-  // Claim: tickets die op dit (geverifieerde) e-mailadres staan maar nog geen
-  // koper-account hadden, koppelen we nu aan deze gebruiker. Idempotent.
-  await db
-    .update(tickets)
-    .set({ koper_user_id: userId })
-    .where(and(sql`lower(${tickets.koper_email}) = lower(${email})`, isNull(tickets.koper_user_id)))
+    // Claim: tickets die op dit (geverifieerde) e-mailadres staan maar nog geen
+    // koper-account hadden, koppelen we nu aan deze gebruiker. Idempotent.
+    await db
+      .update(tickets)
+      .set({ koper_user_id: userId })
+      .where(
+        and(
+          sql`lower(${tickets.koper_email}) = lower(${email})`,
+          isNull(tickets.koper_user_id),
+        ),
+      )
 
-  const rows = await db
-    .select({
-      code: tickets.code,
-      gebruikt_op: tickets.gebruikt_op,
-      ingetrokken_op: tickets.ingetrokken_op,
-      type_naam: ticketTypes.naam,
-      event_naam: events.naam,
-      datum_start: events.datum_start,
-      locatie: events.locatie,
-    })
-    .from(tickets)
-    .innerJoin(ticketTypes, eq(tickets.ticket_type_id, ticketTypes.id))
-    .innerJoin(events, eq(tickets.event_id, events.id))
-    .where(eq(tickets.koper_user_id, userId))
-    .orderBy(desc(events.datum_start))
+    const rows = await db
+      .select({
+        code: tickets.code,
+        gebruikt_op: tickets.gebruikt_op,
+        ingetrokken_op: tickets.ingetrokken_op,
+        type_naam: ticketTypes.naam,
+        event_id: events.id,
+        event_naam: events.naam,
+        datum_start: events.datum_start,
+        locatie: events.locatie,
+        categorie: events.categorie,
+        cover: events.cover_afbeelding_url,
+      })
+      .from(tickets)
+      .innerJoin(ticketTypes, eq(tickets.ticket_type_id, ticketTypes.id))
+      .innerJoin(events, eq(tickets.event_id, events.id))
+      .where(eq(tickets.koper_user_id, userId))
+      .orderBy(desc(events.datum_start))
 
-  return rows.map((r) => ({
-    code: r.code,
-    event_naam: r.event_naam,
-    datum_start: r.datum_start,
-    locatie: r.locatie,
-    type_naam: r.type_naam,
-    status: r.ingetrokken_op ? 'ingetrokken' : r.gebruikt_op ? 'gebruikt' : 'geldig',
-    gebruikt_op: r.gebruikt_op,
-  }))
-})
+    return rows.map((r) => ({
+      code: r.code,
+      event_id: r.event_id,
+      event_naam: r.event_naam,
+      datum_start: r.datum_start,
+      locatie: r.locatie,
+      categorie: r.categorie,
+      cover: r.cover,
+      type_naam: r.type_naam,
+      status: r.ingetrokken_op
+        ? 'ingetrokken'
+        : r.gebruikt_op
+          ? 'gebruikt'
+          : 'geldig',
+      gebruikt_op: r.gebruikt_op,
+    }))
+  },
+)
