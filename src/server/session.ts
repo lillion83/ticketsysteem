@@ -56,6 +56,14 @@ export const getCurrentUser = createServerFn({ method: 'GET' }).handler(
 )
 
 /**
+ * Of Google-login geconfigureerd is (server-env). De client kan dit niet zelf
+ * zien, dus lezen we het serverside uit om de Google-knop te tonen of te verbergen.
+ */
+export const googleBeschikbaar = createServerFn({ method: 'GET' }).handler(async () =>
+  Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET),
+)
+
+/**
  * Sessie zonder org-eis, voor het kopersgedeelte (Mijn Tickets). Gooit als er
  * geen sessie is. Server-only: leest request-headers.
  */
