@@ -52,7 +52,7 @@ export const wordOrganisator = createServerFn({ method: 'POST' })
 
     await db
       .update(user)
-      .set({ organizationId: org.id, updatedAt: new Date() })
+      .set({ organizationId: org.id, rol: 'organisator', updatedAt: new Date() })
       .where(eq(user.id, userId))
 
     return { organizationId: org.id }

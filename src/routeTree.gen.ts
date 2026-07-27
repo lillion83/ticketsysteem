@@ -13,17 +13,21 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminRouteRouteImport } from './routes/admin/route'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as MijnTicketRouteImport } from './routes/mijn-ticket'
+import { Route as PlatformRouteRouteImport } from './routes/platform/route'
+import { Route as ProfielRouteImport } from './routes/profiel'
 import { Route as WordOrganisatorRouteImport } from './routes/word-organisator'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as EventsIndexRouteImport } from './routes/events.index'
 import { Route as EventsEventIdRouteImport } from './routes/events.$eventId'
 import { Route as EventsNewRouteImport } from './routes/events.new'
+import { Route as PlatformIndexRouteImport } from './routes/platform/index'
 import { Route as STokenRouteImport } from './routes/s.$token'
 import { Route as ScanEventIdRouteImport } from './routes/scan.$eventId'
 import { Route as TCodeRouteImport } from './routes/t.$code'
 import { Route as AdminEventsIndexRouteImport } from './routes/admin/events.index'
 import { Route as AdminEventsEventIdRouteImport } from './routes/admin/events.$eventId'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
+import { Route as PlatformEventsIndexRouteImport } from './routes/platform/events.index'
 import { Route as TCodeQrRouteImport } from './routes/t.$code_.qr'
 import { Route as AdminEventsEventIdDeurRouteImport } from './routes/admin/events.$eventId_.deur'
 
@@ -45,6 +49,16 @@ const LoginRoute = LoginRouteImport.update({
 const MijnTicketRoute = MijnTicketRouteImport.update({
   id: '/mijn-ticket',
   path: '/mijn-ticket',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PlatformRouteRoute = PlatformRouteRouteImport.update({
+  id: '/platform',
+  path: '/platform',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProfielRoute = ProfielRouteImport.update({
+  id: '/profiel',
+  path: '/profiel',
   getParentRoute: () => rootRouteImport,
 } as any)
 const WordOrganisatorRoute = WordOrganisatorRouteImport.update({
@@ -71,6 +85,11 @@ const EventsNewRoute = EventsNewRouteImport.update({
   id: '/events/new',
   path: '/events/new',
   getParentRoute: () => rootRouteImport,
+} as any)
+const PlatformIndexRoute = PlatformIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => PlatformRouteRoute,
 } as any)
 const STokenRoute = STokenRouteImport.update({
   id: '/s/$token',
@@ -102,6 +121,11 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   path: '/api/auth/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PlatformEventsIndexRoute = PlatformEventsIndexRouteImport.update({
+  id: '/events/',
+  path: '/events/',
+  getParentRoute: () => PlatformRouteRoute,
+} as any)
 const TCodeQrRoute = TCodeQrRouteImport.update({
   id: '/t/$code_/qr',
   path: '/t/$code/qr',
@@ -116,8 +140,10 @@ const AdminEventsEventIdDeurRoute = AdminEventsEventIdDeurRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteRouteWithChildren
+  '/platform': typeof PlatformRouteRouteWithChildren
   '/login': typeof LoginRoute
   '/mijn-ticket': typeof MijnTicketRoute
+  '/profiel': typeof ProfielRoute
   '/word-organisator': typeof WordOrganisatorRoute
   '/events/$eventId': typeof EventsEventIdRoute
   '/events/new': typeof EventsNewRoute
@@ -126,16 +152,19 @@ export interface FileRoutesByFullPath {
   '/t/$code': typeof TCodeRoute
   '/admin/': typeof AdminIndexRoute
   '/events/': typeof EventsIndexRoute
+  '/platform/': typeof PlatformIndexRoute
   '/admin/events/$eventId': typeof AdminEventsEventIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/t/$code/qr': typeof TCodeQrRoute
   '/admin/events/': typeof AdminEventsIndexRoute
+  '/platform/events/': typeof PlatformEventsIndexRoute
   '/admin/events/$eventId/deur': typeof AdminEventsEventIdDeurRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/mijn-ticket': typeof MijnTicketRoute
+  '/profiel': typeof ProfielRoute
   '/word-organisator': typeof WordOrganisatorRoute
   '/events/$eventId': typeof EventsEventIdRoute
   '/events/new': typeof EventsNewRoute
@@ -144,18 +173,22 @@ export interface FileRoutesByTo {
   '/t/$code': typeof TCodeRoute
   '/admin': typeof AdminIndexRoute
   '/events': typeof EventsIndexRoute
+  '/platform': typeof PlatformIndexRoute
   '/admin/events/$eventId': typeof AdminEventsEventIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/t/$code/qr': typeof TCodeQrRoute
   '/admin/events': typeof AdminEventsIndexRoute
+  '/platform/events': typeof PlatformEventsIndexRoute
   '/admin/events/$eventId/deur': typeof AdminEventsEventIdDeurRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteRouteWithChildren
+  '/platform': typeof PlatformRouteRouteWithChildren
   '/login': typeof LoginRoute
   '/mijn-ticket': typeof MijnTicketRoute
+  '/profiel': typeof ProfielRoute
   '/word-organisator': typeof WordOrganisatorRoute
   '/events/$eventId': typeof EventsEventIdRoute
   '/events/new': typeof EventsNewRoute
@@ -164,10 +197,12 @@ export interface FileRoutesById {
   '/t/$code': typeof TCodeRoute
   '/admin/': typeof AdminIndexRoute
   '/events/': typeof EventsIndexRoute
+  '/platform/': typeof PlatformIndexRoute
   '/admin/events/$eventId': typeof AdminEventsEventIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/t/$code_/qr': typeof TCodeQrRoute
   '/admin/events/': typeof AdminEventsIndexRoute
+  '/platform/events/': typeof PlatformEventsIndexRoute
   '/admin/events/$eventId_/deur': typeof AdminEventsEventIdDeurRoute
 }
 export interface FileRouteTypes {
@@ -175,8 +210,10 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/admin'
+    | '/platform'
     | '/login'
     | '/mijn-ticket'
+    | '/profiel'
     | '/word-organisator'
     | '/events/$eventId'
     | '/events/new'
@@ -185,16 +222,19 @@ export interface FileRouteTypes {
     | '/t/$code'
     | '/admin/'
     | '/events/'
+    | '/platform/'
     | '/admin/events/$eventId'
     | '/api/auth/$'
     | '/t/$code/qr'
     | '/admin/events/'
+    | '/platform/events/'
     | '/admin/events/$eventId/deur'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/login'
     | '/mijn-ticket'
+    | '/profiel'
     | '/word-organisator'
     | '/events/$eventId'
     | '/events/new'
@@ -203,17 +243,21 @@ export interface FileRouteTypes {
     | '/t/$code'
     | '/admin'
     | '/events'
+    | '/platform'
     | '/admin/events/$eventId'
     | '/api/auth/$'
     | '/t/$code/qr'
     | '/admin/events'
+    | '/platform/events'
     | '/admin/events/$eventId/deur'
   id:
     | '__root__'
     | '/'
     | '/admin'
+    | '/platform'
     | '/login'
     | '/mijn-ticket'
+    | '/profiel'
     | '/word-organisator'
     | '/events/$eventId'
     | '/events/new'
@@ -222,18 +266,22 @@ export interface FileRouteTypes {
     | '/t/$code'
     | '/admin/'
     | '/events/'
+    | '/platform/'
     | '/admin/events/$eventId'
     | '/api/auth/$'
     | '/t/$code_/qr'
     | '/admin/events/'
+    | '/platform/events/'
     | '/admin/events/$eventId_/deur'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRouteRoute: typeof AdminRouteRouteWithChildren
+  PlatformRouteRoute: typeof PlatformRouteRouteWithChildren
   LoginRoute: typeof LoginRoute
   MijnTicketRoute: typeof MijnTicketRoute
+  ProfielRoute: typeof ProfielRoute
   WordOrganisatorRoute: typeof WordOrganisatorRoute
   EventsEventIdRoute: typeof EventsEventIdRoute
   EventsNewRoute: typeof EventsNewRoute
@@ -275,6 +323,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MijnTicketRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/platform': {
+      id: '/platform'
+      path: '/platform'
+      fullPath: '/platform'
+      preLoaderRoute: typeof PlatformRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/profiel': {
+      id: '/profiel'
+      path: '/profiel'
+      fullPath: '/profiel'
+      preLoaderRoute: typeof ProfielRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/word-organisator': {
       id: '/word-organisator'
       path: '/word-organisator'
@@ -309,6 +371,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/events/new'
       preLoaderRoute: typeof EventsNewRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/platform/': {
+      id: '/platform/'
+      path: '/'
+      fullPath: '/platform/'
+      preLoaderRoute: typeof PlatformIndexRouteImport
+      parentRoute: typeof PlatformRouteRoute
     }
     '/s/$token': {
       id: '/s/$token'
@@ -352,6 +421,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/platform/events/': {
+      id: '/platform/events/'
+      path: '/events'
+      fullPath: '/platform/events/'
+      preLoaderRoute: typeof PlatformEventsIndexRouteImport
+      parentRoute: typeof PlatformRouteRoute
+    }
     '/t/$code_/qr': {
       id: '/t/$code_/qr'
       path: '/t/$code/qr'
@@ -387,11 +463,27 @@ const AdminRouteRouteWithChildren = AdminRouteRoute._addFileChildren(
   AdminRouteRouteChildren,
 )
 
+interface PlatformRouteRouteChildren {
+  PlatformIndexRoute: typeof PlatformIndexRoute
+  PlatformEventsIndexRoute: typeof PlatformEventsIndexRoute
+}
+
+const PlatformRouteRouteChildren: PlatformRouteRouteChildren = {
+  PlatformIndexRoute: PlatformIndexRoute,
+  PlatformEventsIndexRoute: PlatformEventsIndexRoute,
+}
+
+const PlatformRouteRouteWithChildren = PlatformRouteRoute._addFileChildren(
+  PlatformRouteRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRouteRoute: AdminRouteRouteWithChildren,
+  PlatformRouteRoute: PlatformRouteRouteWithChildren,
   LoginRoute: LoginRoute,
   MijnTicketRoute: MijnTicketRoute,
+  ProfielRoute: ProfielRoute,
   WordOrganisatorRoute: WordOrganisatorRoute,
   EventsEventIdRoute: EventsEventIdRoute,
   EventsNewRoute: EventsNewRoute,

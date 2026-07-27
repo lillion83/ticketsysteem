@@ -28,6 +28,15 @@ export const reserveringStatus = pgEnum('reservering_status', [
   'afgewezen',
 ])
 
+// Rol van een gebruiker (fase J). admin = platform-breed overzicht (leest
+// cross-org, de enige uitzondering op harde regel 3); organisator = beheert de
+// eigen org; koper = ziet eigen tickets. Default 'koper'.
+export const gebruikerRol = pgEnum('gebruiker_rol', [
+  'admin',
+  'organisator',
+  'koper',
+])
+
 // Vaste categorie-taxonomie voor de publieke discovery-front-end. Spiegelt de
 // categorieën uit het ontwerp; UI-labels blijven Nederlands.
 export const eventCategorie = pgEnum('event_categorie', [
@@ -54,6 +63,10 @@ export const user = pgTable('user', {
   image: text('image'),
   // Tenant van de ingelogde gebruiker. Elke gescoopte query leest hierop.
   organizationId: uuid('organization_id').references(() => organizations.id),
+  // Rol bepaalt welk dashboard de gebruiker ziet (fase J). Default 'koper';
+  // wordt 'organisator' bij het aanmaken van een organisatie en 'admin' voor het
+  // platformbeheeraccount.
+  rol: gebruikerRol('rol').notNull().default('koper'),
   createdAt: timestamp('created_at', { withTimezone: true })
     .notNull()
     .defaultNow(),

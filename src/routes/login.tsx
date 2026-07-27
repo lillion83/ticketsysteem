@@ -1,6 +1,8 @@
 import { createFileRoute, useNavigate, useRouter } from '@tanstack/react-router'
 import { useState } from 'react'
 import { signIn } from '#/lib/auth-client'
+import { getCurrentUser } from '#/server/session'
+import { homePathForRole } from '#/lib/rol'
 
 export const Route = createFileRoute('/login')({
   // Optioneel pad om na inloggen naar terug te keren (bv. de organiseer-flow).
@@ -50,8 +52,14 @@ function LoginPage() {
     // dat oordeel vast. Zonder invalidate draait beforeLoad niet opnieuw en
     // stuurt /admin je terug naar /login, hoe geldig de nieuwe sessie ook is.
     await router.invalidate()
-    // Keer terug naar de pagina die om login vroeg, anders naar de admin.
-    navigate({ to: redirect ?? '/admin' })
+    // Kwam je via een beschermde pagina? Keer daarheen terug. Anders naar het
+    // dashboard dat bij je rol hoort (admin → /platform, organisator → /admin).
+    if (redirect) {
+      navigate({ to: redirect })
+      return
+    }
+    const user = await getCurrentUser()
+    navigate({ to: homePathForRole(user?.rol) })
   }
 
   return (

@@ -8,29 +8,26 @@ import {
 import type { ReactNode } from 'react'
 import { signOut } from '#/lib/auth-client'
 import { getCurrentUser } from '#/server/session'
-import { ROL_LABEL, homePathForRole } from '#/lib/rol'
-import type { Rol } from '#/lib/rol'
+import { homePathForRole } from '#/lib/rol'
 
-export const Route = createFileRoute('/admin')({
+// Platform-beheer (fase J): uitsluitend voor de admin-rol. Cross-org overzicht.
+export const Route = createFileRoute('/platform')({
   beforeLoad: async () => {
     const user = await getCurrentUser()
     if (!user) throw redirect({ to: '/login' })
-    // De org-beheeromgeving vereist een organisatie om op te scopen. Kopers (geen
-    // org) horen hier niet — naar hun eigen dashboard. Organisator en admin (die
-    // z'n eigen org beheert) hebben een org en mogen door.
-    if (!user.organizationId) throw redirect({ to: homePathForRole(user.rol) })
+    // Alleen de admin mag het platform-brede overzicht zien; anderen naar hun
+    // eigen dashboard.
+    if (user.rol !== 'admin') throw redirect({ to: homePathForRole(user.rol) })
     return { user }
   },
-  component: AdminLayout,
+  component: PlatformLayout,
 })
 
-// Twee initialen uit de e-mail voor de avatar (geen naam op de org-user).
 function initials(email: string): string {
-  const naam = email.split('@')[0]
-  return naam.slice(0, 2).toUpperCase()
+  return email.split('@')[0].slice(0, 2).toUpperCase()
 }
 
-function AdminLayout() {
+function PlatformLayout() {
   const { user } = Route.useRouteContext()
   const navigate = useNavigate()
 
@@ -41,20 +38,22 @@ function AdminLayout() {
 
   return (
     <div className="min-h-screen bg-[#F1F5F9] text-[#0F172A] md:grid md:grid-cols-[244px_1fr]">
-      {/* Zijbalk */}
       <aside className="sticky top-0 hidden h-screen flex-col gap-1.5 self-start border-r border-[#E5E7EB] bg-white px-4 py-5 md:flex">
-        <Link to="/admin" className="px-2.5 pb-4 pt-1 text-[21px] font-extrabold tracking-tight">
-          Ticket<span className="text-[#2563EB]">beheer</span>
+        <Link to="/platform" className="px-2.5 pb-4 pt-1 text-[21px] font-extrabold tracking-tight">
+          Platform<span className="text-[#2563EB]">.</span>
         </Link>
         <div className="px-2.5 pb-1.5 pt-3 text-[11px] font-bold uppercase tracking-wider text-[#94A3B8]">
-          Beheer
+          Overzicht
         </div>
         <nav className="flex flex-col gap-1">
-          <NavItem to="/admin" exact icon={<GridIcon />}>
+          <NavItem to="/platform" exact icon={<GridIcon />}>
             Dashboard
           </NavItem>
-          <NavItem to="/admin/events" icon={<CalendarIcon />}>
-            Events
+          <NavItem to="/platform/events" icon={<CalendarIcon />}>
+            Alle events
+          </NavItem>
+          <NavItem to="/admin" icon={<BuildingIcon />}>
+            Mijn organisatie
           </NavItem>
         </nav>
         <div className="flex-1" />
@@ -75,15 +74,13 @@ function AdminLayout() {
         </button>
       </aside>
 
-      {/* Hoofdkolom */}
       <div className="min-w-0">
-        {/* Mobiele topbalk (geen zijbalk op klein scherm) */}
         <div className="flex items-center justify-between border-b border-[#E5E7EB] bg-white px-5 py-3 md:hidden">
-          <Link to="/admin" className="text-[18px] font-extrabold">
-            Ticket<span className="text-[#2563EB]">beheer</span>
+          <Link to="/platform" className="text-[18px] font-extrabold">
+            Platform<span className="text-[#2563EB]">.</span>
           </Link>
           <div className="flex items-center gap-3">
-            <Link to="/admin/events" className="text-[14px] font-semibold text-[#2563EB]">
+            <Link to="/platform/events" className="text-[14px] font-semibold text-[#2563EB]">
               Events
             </Link>
             <button onClick={uitloggen} className="text-[14px] font-semibold text-[#64748B]">
@@ -92,18 +89,14 @@ function AdminLayout() {
           </div>
         </div>
 
-        {/* Topbar met gebruikerschip */}
         <header className="hidden items-center justify-end gap-4 px-7 pt-5 md:flex">
-          <div className="relative grid h-10 w-10 place-items-center rounded-full border border-[#E5E7EB] bg-white" title="Notificaties">
-            <BellIcon />
-          </div>
           <div className="flex items-center gap-3">
             <div className="grid h-10 w-10 place-items-center rounded-full bg-gradient-to-br from-[#2563EB] to-[#7C3AED] text-[13px] font-extrabold text-white">
               {initials(user.email)}
             </div>
             <div className="leading-tight">
               <div className="text-[14px] font-bold">{user.email}</div>
-              <div className="text-[12px] text-[#64748B]">{ROL_LABEL[user.rol as Rol]}</div>
+              <div className="text-[12px] text-[#64748B]">Admin</div>
             </div>
           </div>
         </header>
@@ -115,8 +108,6 @@ function AdminLayout() {
     </div>
   )
 }
-
-// ── Navigatie-item ──────────────────────────────────────────────────────────
 
 function NavItem({
   to,
@@ -142,8 +133,6 @@ function NavItem({
   )
 }
 
-// ── Iconen (inline SVG, zelfde stijl als de discovery-front-end) ─────────────
-
 function GridIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -154,7 +143,6 @@ function GridIcon() {
     </svg>
   )
 }
-
 function CalendarIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -163,29 +151,26 @@ function CalendarIcon() {
     </svg>
   )
 }
-
-function LogoutIcon() {
+function BuildingIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M15 3H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h7M18 12H9M15 8l4 4-4 4" />
+      <rect x="4" y="3" width="16" height="18" rx="1.5" />
+      <path d="M9 7h2M13 7h2M9 11h2M13 11h2M9 15h2M13 15h2" />
     </svg>
   )
 }
-
-function BellIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#64748B" strokeWidth="2" strokeLinecap="round">
-      <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
-      <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-    </svg>
-  )
-}
-
 function UserIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
       <circle cx="12" cy="8" r="4" />
       <path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8" />
+    </svg>
+  )
+}
+function LogoutIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M15 3H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h7M18 12H9M15 8l4 4-4 4" />
     </svg>
   )
 }

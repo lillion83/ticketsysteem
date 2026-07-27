@@ -67,6 +67,13 @@ export const auth = betterAuth({
         required: false,
         input: false,
       },
+      // Rol van de gebruiker (fase J). Komt mee in de sessie zodat guards en
+      // rol-landing serverside kunnen beslissen. Nooit door de client te zetten.
+      rol: {
+        type: 'string',
+        required: false,
+        input: false,
+      },
     },
   },
   plugins: [

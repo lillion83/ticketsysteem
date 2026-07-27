@@ -45,12 +45,16 @@ export const getCurrentUser = createServerFn({ method: 'GET' }).handler(
       headers: getRequest().headers,
     })
     if (!session?.user) return null
+    const u = session.user as {
+      organizationId?: string
+      rol?: string
+    }
     return {
       id: session.user.id,
       name: session.user.name,
       email: session.user.email,
-      organizationId:
-        (session.user as { organizationId?: string }).organizationId ?? null,
+      organizationId: u.organizationId ?? null,
+      rol: u.rol ?? 'koper',
     }
   },
 )
@@ -61,6 +65,28 @@ export const getCurrentUser = createServerFn({ method: 'GET' }).handler(
  */
 export const googleBeschikbaar = createServerFn({ method: 'GET' }).handler(async () =>
   Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET),
+)
+
+/**
+ * Admin-sessie (fase J). Eist rol 'admin' en geeft alléén de userId terug —
+ * bewust GEEN organizationId, want de admin leest platform-breed (cross-org).
+ *
+ * Dit is de ENIGE plek waar cross-org gelezen mag worden: de gedocumenteerde
+ * uitzondering op harde regel 3, in overleg met Amresh vastgelegd (fase J).
+ * Gebruik dit uitsluitend in read-only platform-endpoints (src/server/platform.ts);
+ * alle overige data-endpoints blijven org-gescoopt via requireAuth.
+ * Server-only: leest request-headers.
+ */
+export const requireAdmin = createServerOnlyFn(
+  async (): Promise<{ userId: string }> => {
+    const session = await auth.api.getSession({
+      headers: getRequest().headers,
+    })
+    if (!session?.user) throw new Error('Niet ingelogd')
+    const rol = (session.user as { rol?: string }).rol
+    if (rol !== 'admin') throw new Error('Geen admin-rechten')
+    return { userId: session.user.id }
+  },
 )
 
 /**
