@@ -21,6 +21,7 @@ import { Route as EventsNewRouteImport } from './routes/events.new'
 import { Route as STokenRouteImport } from './routes/s.$token'
 import { Route as ScanEventIdRouteImport } from './routes/scan.$eventId'
 import { Route as TCodeRouteImport } from './routes/t.$code'
+import { Route as AdminEventsIndexRouteImport } from './routes/admin/events.index'
 import { Route as AdminEventsEventIdRouteImport } from './routes/admin/events.$eventId'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as TCodeQrRouteImport } from './routes/t.$code_.qr'
@@ -86,6 +87,11 @@ const TCodeRoute = TCodeRouteImport.update({
   path: '/t/$code',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminEventsIndexRoute = AdminEventsIndexRouteImport.update({
+  id: '/events/',
+  path: '/events/',
+  getParentRoute: () => AdminRouteRoute,
+} as any)
 const AdminEventsEventIdRoute = AdminEventsEventIdRouteImport.update({
   id: '/events/$eventId',
   path: '/events/$eventId',
@@ -123,6 +129,7 @@ export interface FileRoutesByFullPath {
   '/admin/events/$eventId': typeof AdminEventsEventIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/t/$code/qr': typeof TCodeQrRoute
+  '/admin/events/': typeof AdminEventsIndexRoute
   '/admin/events/$eventId/deur': typeof AdminEventsEventIdDeurRoute
 }
 export interface FileRoutesByTo {
@@ -140,6 +147,7 @@ export interface FileRoutesByTo {
   '/admin/events/$eventId': typeof AdminEventsEventIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/t/$code/qr': typeof TCodeQrRoute
+  '/admin/events': typeof AdminEventsIndexRoute
   '/admin/events/$eventId/deur': typeof AdminEventsEventIdDeurRoute
 }
 export interface FileRoutesById {
@@ -159,6 +167,7 @@ export interface FileRoutesById {
   '/admin/events/$eventId': typeof AdminEventsEventIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/t/$code_/qr': typeof TCodeQrRoute
+  '/admin/events/': typeof AdminEventsIndexRoute
   '/admin/events/$eventId_/deur': typeof AdminEventsEventIdDeurRoute
 }
 export interface FileRouteTypes {
@@ -179,6 +188,7 @@ export interface FileRouteTypes {
     | '/admin/events/$eventId'
     | '/api/auth/$'
     | '/t/$code/qr'
+    | '/admin/events/'
     | '/admin/events/$eventId/deur'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -196,6 +206,7 @@ export interface FileRouteTypes {
     | '/admin/events/$eventId'
     | '/api/auth/$'
     | '/t/$code/qr'
+    | '/admin/events'
     | '/admin/events/$eventId/deur'
   id:
     | '__root__'
@@ -214,6 +225,7 @@ export interface FileRouteTypes {
     | '/admin/events/$eventId'
     | '/api/auth/$'
     | '/t/$code_/qr'
+    | '/admin/events/'
     | '/admin/events/$eventId_/deur'
   fileRoutesById: FileRoutesById
 }
@@ -319,6 +331,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TCodeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/events/': {
+      id: '/admin/events/'
+      path: '/events'
+      fullPath: '/admin/events/'
+      preLoaderRoute: typeof AdminEventsIndexRouteImport
+      parentRoute: typeof AdminRouteRoute
+    }
     '/admin/events/$eventId': {
       id: '/admin/events/$eventId'
       path: '/events/$eventId'
@@ -353,12 +372,14 @@ declare module '@tanstack/react-router' {
 interface AdminRouteRouteChildren {
   AdminIndexRoute: typeof AdminIndexRoute
   AdminEventsEventIdRoute: typeof AdminEventsEventIdRoute
+  AdminEventsIndexRoute: typeof AdminEventsIndexRoute
   AdminEventsEventIdDeurRoute: typeof AdminEventsEventIdDeurRoute
 }
 
 const AdminRouteRouteChildren: AdminRouteRouteChildren = {
   AdminIndexRoute: AdminIndexRoute,
   AdminEventsEventIdRoute: AdminEventsEventIdRoute,
+  AdminEventsIndexRoute: AdminEventsIndexRoute,
   AdminEventsEventIdDeurRoute: AdminEventsEventIdDeurRoute,
 }
 
@@ -384,3 +405,12 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { createStart } from '@tanstack/react-start'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+  }
+}
