@@ -27,29 +27,48 @@ export const Route = createFileRoute('/admin/events/$eventId_/deur')({
   component: DeurPagina,
 })
 
+const inputSm =
+  'rounded-[9px] border border-[#E5E7EB] bg-[#F8FAFC] px-3 py-2 text-[13.5px] outline-none focus:border-[#2563EB]'
+
+function Sectie({ children }: { children: React.ReactNode }) {
+  return <div className="rounded-2xl border border-[#E5E7EB] bg-white p-5 shadow-sm sm:p-6">{children}</div>
+}
+
+const thCls = 'bg-[#F8FAFC] px-4 py-2.5 font-bold'
+
 function DeurPagina() {
   const { event } = Route.useLoaderData()
   const { eventId } = Route.useParams()
 
   return (
-    <div className="flex flex-col gap-8">
-      <div className="flex items-center justify-between">
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold">{event.naam}</h1>
-          <p className="text-sm text-gray-500">Deurbeheer &amp; rapportage</p>
+          <div className="mb-1 text-[13px] text-[#64748B]">
+            <Link to="/admin/events" className="hover:text-[#0F172A]">
+              Events
+            </Link>{' '}
+            /{' '}
+            <Link to="/admin/events/$eventId" params={{ eventId }} className="hover:text-[#0F172A]">
+              {event.naam}
+            </Link>{' '}
+            / <span className="font-semibold text-[#0F172A]">Deur &amp; rapportage</span>
+          </div>
+          <h1 className="text-[24px] font-extrabold tracking-tight">{event.naam}</h1>
+          <p className="text-[13px] text-[#64748B]">Deurbeheer &amp; rapportage</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Link
             to="/admin/events/$eventId"
             params={{ eventId }}
-            className="rounded border border-gray-300 px-3 py-1 text-sm hover:bg-gray-50"
+            className="rounded-full border border-[#E5E7EB] bg-white px-4 py-2 text-[13px] font-semibold text-[#0F172A] hover:border-[#CBD5E1]"
           >
             ← Event
           </Link>
           <Link
             to="/scan/$eventId"
             params={{ eventId }}
-            className="rounded bg-black px-3 py-1 text-sm font-medium text-white"
+            className="rounded-full bg-[#2563EB] px-4 py-2 text-[13px] font-bold text-white hover:bg-[#1D4ED8]"
           >
             Scannen
           </Link>
@@ -88,20 +107,16 @@ function TellerSectie() {
   }, [eventId])
 
   return (
-    <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-      <Kaart label="Binnen" waarde={stats.binnen} accent="text-green-700" />
-      <Kaart label="Nog buiten" waarde={stats.buiten} />
-      <Kaart label="Verkocht" waarde={stats.verkocht} />
-      <Kaart
-        label="Ingetrokken"
-        waarde={stats.ingetrokken}
-        accent="text-red-600"
-      />
+    <section className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+      <TellerKaart label="Binnen" waarde={stats.binnen} accent="text-[#16A34A]" />
+      <TellerKaart label="Nog buiten" waarde={stats.buiten} />
+      <TellerKaart label="Verkocht" waarde={stats.verkocht} />
+      <TellerKaart label="Ingetrokken" waarde={stats.ingetrokken} accent="text-[#DC2626]" />
     </section>
   )
 }
 
-function Kaart({
+function TellerKaart({
   label,
   waarde,
   accent,
@@ -111,9 +126,9 @@ function Kaart({
   accent?: string
 }) {
   return (
-    <div className="rounded border border-gray-200 p-4">
-      <div className={`text-3xl font-bold ${accent ?? ''}`}>{waarde}</div>
-      <div className="text-sm text-gray-500">{label}</div>
+    <div className="rounded-2xl border border-[#E5E7EB] bg-white p-5 shadow-sm">
+      <div className={`text-[30px] font-extrabold tracking-tight tabular-nums ${accent ?? ''}`}>{waarde}</div>
+      <div className="text-[13px] font-semibold text-[#64748B]">{label}</div>
     </div>
   )
 }
@@ -123,12 +138,12 @@ function Kaart({
 function sessieStatus(s: {
   ingetrokken_op: string | null
   vervalt_op: string | null
-}): { tekst: string; kleur: string } {
-  if (s.ingetrokken_op) return { tekst: 'ingetrokken', kleur: 'text-red-600' }
+}): { tekst: string; cls: string } {
+  if (s.ingetrokken_op) return { tekst: 'Ingetrokken', cls: 'bg-[#FEE2E2] text-[#DC2626]' }
   if (s.vervalt_op && new Date(s.vervalt_op) < new Date()) {
-    return { tekst: 'verlopen', kleur: 'text-gray-500' }
+    return { tekst: 'Verlopen', cls: 'bg-[#F1F5F9] text-[#64748B]' }
   }
-  return { tekst: 'actief', kleur: 'text-green-700' }
+  return { tekst: 'Actief', cls: 'bg-[#DCFCE7] text-[#16A34A]' }
 }
 
 function SessiesSectie() {
@@ -165,77 +180,74 @@ function SessiesSectie() {
   }
 
   return (
-    <section>
-      <h2 className="mb-3 text-lg font-semibold">Scanners</h2>
+    <Sectie>
+      <h2 className="mb-4 text-[16px] font-extrabold">Scanners</h2>
 
-      <table className="w-full border border-gray-200 text-sm">
-        <thead className="bg-gray-50 text-left">
-          <tr>
-            <th className="px-3 py-2">Label</th>
-            <th className="px-3 py-2">Status</th>
-            <th className="px-3 py-2">Laatste sync</th>
-            <th className="px-3 py-2">Scans</th>
-            <th className="px-3 py-2"></th>
-          </tr>
-        </thead>
-        <tbody>
-          {sessies.map((s) => {
-            const st = sessieStatus(s)
-            return (
-              <tr key={s.id} className="border-t border-gray-200">
-                <td className="px-3 py-2">{s.label || '—'}</td>
-                <td className={`px-3 py-2 ${st.kleur}`}>{st.tekst}</td>
-                <td className="px-3 py-2 text-gray-600">
-                  {s.laatste_sync
-                    ? new Date(s.laatste_sync).toLocaleString('nl-NL')
-                    : 'nog niet'}
-                </td>
-                <td className="px-3 py-2">{s.aantal_scans}</td>
-                <td className="px-3 py-2 text-right">
-                  {!s.ingetrokken_op && (
-                    <button
-                      onClick={() => intrekken(s.id)}
-                      className="text-red-600 hover:underline"
-                    >
-                      intrekken
-                    </button>
-                  )}
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[560px] border-collapse text-[13.5px]">
+          <thead>
+            <tr className="text-left text-[#64748B]">
+              <th className={`rounded-l-[9px] ${thCls}`}>Label</th>
+              <th className={thCls}>Status</th>
+              <th className={thCls}>Laatste sync</th>
+              <th className={thCls}>Scans</th>
+              <th className={`rounded-r-[9px] ${thCls}`}></th>
+            </tr>
+          </thead>
+          <tbody>
+            {sessies.map((s) => {
+              const st = sessieStatus(s)
+              return (
+                <tr key={s.id} className="border-t border-[#E5E7EB]">
+                  <td className="px-4 py-3 font-semibold">{s.label || '—'}</td>
+                  <td className="px-4 py-3">
+                    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-bold ${st.cls}`}>
+                      <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                      {st.tekst}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-[#64748B]">
+                    {s.laatste_sync ? new Date(s.laatste_sync).toLocaleString('nl-NL') : 'nog niet'}
+                  </td>
+                  <td className="px-4 py-3 tabular-nums">{s.aantal_scans}</td>
+                  <td className="px-4 py-3 text-right">
+                    {!s.ingetrokken_op && (
+                      <button onClick={() => intrekken(s.id)} className="text-[13px] font-semibold text-[#DC2626] hover:underline">
+                        intrekken
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              )
+            })}
+            {sessies.length === 0 && (
+              <tr>
+                <td colSpan={5} className="px-4 py-4 text-[#64748B]">
+                  Nog geen scanners gekoppeld.
                 </td>
               </tr>
-            )
-          })}
-          {sessies.length === 0 && (
-            <tr>
-              <td colSpan={5} className="px-3 py-3 text-gray-500">
-                Nog geen scanners gekoppeld.
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
+            )}
+          </tbody>
+        </table>
+      </div>
 
-      <form onSubmit={koppelen} className="mt-3 flex items-end gap-2">
-        <label className="flex flex-col gap-1">
-          <span className="text-xs font-medium">Label (bv. Ingang, VIP)</span>
-          <input
-            value={label}
-            onChange={(e) => setLabel(e.target.value)}
-            placeholder="Ingang"
-            className="rounded border border-gray-300 px-3 py-2 text-sm"
-          />
+      <form onSubmit={koppelen} className="mt-4 flex flex-wrap items-end gap-2">
+        <label className="flex flex-col gap-1.5">
+          <span className="text-[13px] font-bold">Label (bv. Ingang, VIP)</span>
+          <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Ingang" className={inputSm} />
         </label>
         <button
           type="submit"
           disabled={bezig}
-          className="rounded bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+          className="rounded-full bg-[#2563EB] px-5 py-2.5 text-[14px] font-bold text-white hover:bg-[#1D4ED8] disabled:opacity-50"
         >
           {bezig ? 'Bezig…' : 'Scanner koppelen'}
         </button>
       </form>
-      {fout && <p className="mt-2 text-sm text-red-600">{fout}</p>}
+      {fout && <p className="mt-2 text-[14px] font-semibold text-[#DC2626]">{fout}</p>}
 
       {nieuw && <KoppelKaart nieuw={nieuw} onSluiten={() => setNieuw(null)} />}
-    </section>
+    </Sectie>
   )
 }
 
@@ -259,37 +271,31 @@ function KoppelKaart({
   }
 
   return (
-    <div className="mt-4 rounded border border-green-300 bg-green-50 p-4">
-      <div className="flex items-start justify-between">
+    <div className="mt-4 rounded-[14px] border border-[#BBF7D0] bg-[#F0FDF4] p-4">
+      <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-sm font-medium text-green-900">
-            Scanner gekoppeld. Laat de deurtelefoon deze QR scannen of open de
-            link.
+          <p className="text-[14px] font-bold text-[#166534]">
+            Scanner gekoppeld. Laat de deurtelefoon deze QR scannen of open de link.
           </p>
-          <p className="mt-1 text-xs text-green-800">
+          <p className="mt-1 text-[12px] text-[#15803D]">
             Deze link is nu éénmalig te zien — daarna niet meer op te vragen.
           </p>
         </div>
-        <button
-          onClick={onSluiten}
-          className="text-sm text-green-900 hover:underline"
-        >
+        <button onClick={onSluiten} className="text-[13px] font-semibold text-[#166534] hover:underline">
           sluiten
         </button>
       </div>
       <div className="mt-3 flex flex-wrap items-center gap-4">
         <div
-          className="h-40 w-40 bg-white p-2 [&>svg]:h-full [&>svg]:w-full"
+          className="h-40 w-40 rounded-[10px] bg-white p-2 [&>svg]:h-full [&>svg]:w-full"
           // QR server-side gegenereerd; qrcode blijft uit de client-bundel.
           dangerouslySetInnerHTML={{ __html: nieuw.qrSvg }}
         />
         <div className="flex min-w-0 flex-col gap-2">
-          <code className="max-w-full break-all rounded bg-white px-2 py-1 text-xs">
-            {nieuw.url}
-          </code>
+          <code className="max-w-full break-all rounded-[8px] bg-white px-2.5 py-1.5 text-[12px]">{nieuw.url}</code>
           <button
             onClick={kopieer}
-            className="self-start rounded border border-green-400 px-3 py-1 text-sm text-green-900 hover:bg-green-100"
+            className="self-start rounded-full border border-[#86EFAC] bg-white px-4 py-1.5 text-[13px] font-semibold text-[#166534] hover:bg-[#F0FDF4]"
           >
             {gekopieerd ? 'Gekopieerd ✓' : 'Kopieer link'}
           </button>
@@ -329,9 +335,7 @@ function ScanlogSectie() {
       ['Tijd (server)', 'Tijd (telefoon)', 'Resultaat', 'Naam', 'Scanner'],
       rijen.map((r) => [
         new Date(r.tijdstip_server).toLocaleString('nl-NL'),
-        r.tijdstip_client
-          ? new Date(r.tijdstip_client).toLocaleString('nl-NL')
-          : '',
+        r.tijdstip_client ? new Date(r.tijdstip_client).toLocaleString('nl-NL') : '',
         RESULTAAT_LABEL[r.resultaat],
         r.koper_naam,
         r.sessie_label,
@@ -342,16 +346,14 @@ function ScanlogSectie() {
   }
 
   return (
-    <section>
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-lg font-semibold">Scanlog ({lijst.length})</h2>
+    <Sectie>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-[16px] font-extrabold">Scanlog ({lijst.length})</h2>
         <div className="flex items-center gap-2">
           <select
             value={filter}
-            onChange={(e) =>
-              setFilter(e.target.value as 'alle' | 'groen' | 'rood')
-            }
-            className="rounded border border-gray-300 px-3 py-1 text-sm"
+            onChange={(e) => setFilter(e.target.value as 'alle' | 'groen' | 'rood')}
+            className={inputSm}
           >
             <option value="alle">Alle</option>
             <option value="groen">Alleen groen</option>
@@ -360,54 +362,56 @@ function ScanlogSectie() {
           <button
             onClick={() => exporteer(lijst)}
             disabled={lijst.length === 0}
-            className="rounded border border-gray-300 px-3 py-1 text-sm hover:bg-gray-50 disabled:opacity-40"
+            className="rounded-full border border-[#E5E7EB] bg-white px-4 py-2 text-[13px] font-semibold text-[#0F172A] hover:border-[#CBD5E1] disabled:opacity-40"
           >
             Export CSV
           </button>
         </div>
       </div>
 
-      <table className="w-full border border-gray-200 text-sm">
-        <thead className="bg-gray-50 text-left">
-          <tr>
-            <th className="px-3 py-2">Tijd</th>
-            <th className="px-3 py-2">Resultaat</th>
-            <th className="px-3 py-2">Naam</th>
-            <th className="px-3 py-2">Scanner</th>
-          </tr>
-        </thead>
-        <tbody>
-          {lijst.map((r) => (
-            <tr key={r.id} className="border-t border-gray-200">
-              <td className="px-3 py-2 text-gray-600">
-                {new Date(r.tijdstip_server).toLocaleString('nl-NL')}
-              </td>
-              <td className="px-3 py-2">
-                <span
-                  className={
-                    isGroenResultaat(r.resultaat)
-                      ? 'text-green-700'
-                      : 'text-red-600'
-                  }
-                >
-                  {RESULTAAT_LABEL[r.resultaat]}
-                </span>
-              </td>
-              <td className="px-3 py-2">{r.koper_naam || '—'}</td>
-              <td className="px-3 py-2 text-gray-600">
-                {r.sessie_label || '—'}
-              </td>
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[560px] border-collapse text-[13.5px]">
+          <thead>
+            <tr className="text-left text-[#64748B]">
+              <th className={`rounded-l-[9px] ${thCls}`}>Tijd</th>
+              <th className={thCls}>Resultaat</th>
+              <th className={thCls}>Naam</th>
+              <th className={`rounded-r-[9px] ${thCls}`}>Scanner</th>
             </tr>
-          ))}
-          {lijst.length === 0 && (
-            <tr>
-              <td colSpan={4} className="px-3 py-3 text-gray-500">
-                Nog geen scans.
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
-    </section>
+          </thead>
+          <tbody>
+            {lijst.map((r) => {
+              const groen = isGroenResultaat(r.resultaat)
+              return (
+                <tr key={r.id} className="border-t border-[#E5E7EB]">
+                  <td className="px-4 py-3 tabular-nums text-[#64748B]">
+                    {new Date(r.tijdstip_server).toLocaleString('nl-NL')}
+                  </td>
+                  <td className="px-4 py-3">
+                    <span
+                      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-bold ${
+                        groen ? 'bg-[#DCFCE7] text-[#16A34A]' : 'bg-[#FEE2E2] text-[#DC2626]'
+                      }`}
+                    >
+                      <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                      {RESULTAAT_LABEL[r.resultaat]}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">{r.koper_naam || '—'}</td>
+                  <td className="px-4 py-3 text-[#64748B]">{r.sessie_label || '—'}</td>
+                </tr>
+              )
+            })}
+            {lijst.length === 0 && (
+              <tr>
+                <td colSpan={4} className="px-4 py-4 text-[#64748B]">
+                  Nog geen scans.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </Sectie>
   )
 }
