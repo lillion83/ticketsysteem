@@ -94,6 +94,7 @@ export type FullEventInput = {
   datum_start: string
   datum_eind: string
   locatie: string | null
+  cover_afbeelding_url: string | null
   status: 'concept' | 'actief'
   tiers: Array<{ naam: string; prijs_srd: string; aantal_beschikbaar: string; features: Array<string> }>
   sprekers: Array<{ naam: string; rol: string | null }>
@@ -109,7 +110,7 @@ function parseFullEventInput(data: FullEventInput): FullEventInput {
     status: data.status,
     categorie: data.categorie,
     beschrijving: data.beschrijving,
-    cover_afbeelding_url: null,
+    cover_afbeelding_url: data.cover_afbeelding_url,
   })
   // Alleen tiers met een naam tellen mee; hun prijs en aantal moeten geldig zijn.
   const tiers = data.tiers.filter((t) => t.naam.trim())
@@ -143,6 +144,7 @@ export const createFullEvent = createServerFn({ method: 'POST' })
           status: data.status,
           categorie: data.categorie,
           beschrijving: data.beschrijving?.trim() || null,
+          cover_afbeelding_url: data.cover_afbeelding_url?.trim() || null,
         })
         .returning()
 

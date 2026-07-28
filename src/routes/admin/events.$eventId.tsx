@@ -30,6 +30,7 @@ import {
   verwerkReservering,
 } from '#/server/reserveringen'
 import { eventCategories } from '#/components/discovery/data'
+import { CoverUpload } from '#/components/cover-upload'
 import { ticketBericht, whatsappLink } from '#/lib/whatsapp'
 import { kortCode } from '#/lib/scanResult'
 
@@ -281,8 +282,8 @@ function EventSectie() {
             <Veld label="Beschrijving (publiek)">
               <textarea value={beschrijving} onChange={(e) => setBeschrijving(e.target.value)} rows={4} className={inputCls} />
             </Veld>
-            <Veld label="Cover-afbeelding URL (publiek)">
-              <input value={coverUrl} onChange={(e) => setCoverUrl(e.target.value)} placeholder="https://…" className={inputCls} />
+            <Veld label="Cover-afbeelding (publiek)">
+              <CoverUpload value={coverUrl} onChange={setCoverUrl} />
             </Veld>
             {fout && <p className="text-[14px] font-semibold text-[#DC2626]">{fout}</p>}
             <PrimaryBtn type="submit">Opslaan</PrimaryBtn>

@@ -15,6 +15,7 @@ import {
   listSprekers,
 } from '#/server/eventContent'
 import { eventCategories } from '#/components/discovery/data'
+import { CoverUpload } from '#/components/cover-upload'
 
 type Categorie = (typeof eventCategories)[number]
 
@@ -181,8 +182,8 @@ function EventSectie() {
         <Veld label="Beschrijving (publiek)">
           <textarea value={beschrijving} onChange={(e) => setBeschrijving(e.target.value)} rows={4} className={inputCls} />
         </Veld>
-        <Veld label="Cover-afbeelding URL (publiek)">
-          <input value={coverUrl} onChange={(e) => setCoverUrl(e.target.value)} placeholder="https://…" className={inputCls} />
+        <Veld label="Cover-afbeelding (publiek)">
+          <CoverUpload value={coverUrl} onChange={setCoverUrl} />
         </Veld>
         {fout && <p className="text-[14px] font-semibold text-[#DC2626]">{fout}</p>}
         {ok && <p className="text-[14px] font-semibold text-[#16A34A]">Opgeslagen ✓</p>}

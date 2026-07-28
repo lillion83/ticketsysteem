@@ -12,3 +12,6 @@ dist-ssr
 .vinxi
 __unconfig*
 todos.json
+
+# Geüploade afbeeldingen (cover-afbeeldingen). Staan op de schijf van de server.
+uploads

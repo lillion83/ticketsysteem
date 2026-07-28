@@ -61,7 +61,7 @@ function EventDetailPage() {
 
       <div className="mx-auto max-w-[1280px] px-6 pb-20 pt-8 md:px-12">
         {/* Hero */}
-        <div className="relative mb-9 h-[380px] overflow-hidden rounded-[20px]" style={coverStyle(detail.categorie)}>
+        <div className="relative mb-9 h-[380px] overflow-hidden rounded-[20px]" style={coverStyle(detail.categorie, detail.cover)}>
           <div className="absolute inset-0 bg-[linear-gradient(transparent_40%,rgba(0,0,0,0.75))]" />
           <div className="absolute bottom-7 left-8 text-white">
             <h1 className="mb-2 text-[30px] font-extrabold md:text-[38px]">{detail.titel}</h1>

@@ -284,7 +284,7 @@ function EventsOverzicht() {
                   params={{ eventId: ev.id }}
                   className="block overflow-hidden rounded-[16px] border border-[#E5E7EB] bg-white text-[#0F172A] shadow-[0_1px_3px_rgba(15,23,42,0.05)] transition hover:shadow-md"
                 >
-                  <div className="relative h-[140px]" style={coverStyle(ev.categorie)}>
+                  <div className="relative h-[140px]" style={coverStyle(ev.categorie, ev.cover)}>
                     {ev.categorie && (
                       <div className="absolute left-2.5 top-2.5 rounded-full bg-[#DBEAFE] px-2.5 py-1 text-[11px] font-bold text-[#2563EB]">
                         {ev.categorie}

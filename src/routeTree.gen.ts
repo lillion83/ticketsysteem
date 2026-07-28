@@ -17,6 +17,7 @@ import { Route as PlatformRouteRouteImport } from './routes/platform/route'
 import { Route as ProfielRouteImport } from './routes/profiel'
 import { Route as WordOrganisatorRouteImport } from './routes/word-organisator'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
+import { Route as ApiCoverRouteImport } from './routes/api/cover'
 import { Route as EventsIndexRouteImport } from './routes/events.index'
 import { Route as EventsEventIdRouteImport } from './routes/events.$eventId'
 import { Route as EventsNewRouteImport } from './routes/events.new'
@@ -25,6 +26,7 @@ import { Route as PlatformIndexRouteImport } from './routes/platform/index'
 import { Route as STokenRouteImport } from './routes/s.$token'
 import { Route as ScanEventIdRouteImport } from './routes/scan.$eventId'
 import { Route as TCodeRouteImport } from './routes/t.$code'
+import { Route as UploadsBestandRouteImport } from './routes/uploads.$bestand'
 import { Route as AdminEventsIndexRouteImport } from './routes/admin/events.index'
 import { Route as AdminEventsEventIdRouteImport } from './routes/admin/events.$eventId'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
@@ -73,6 +75,11 @@ const AdminIndexRoute = AdminIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AdminRouteRoute,
 } as any)
+const ApiCoverRoute = ApiCoverRouteImport.update({
+  id: '/api/cover',
+  path: '/api/cover',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const EventsIndexRoute = EventsIndexRouteImport.update({
   id: '/events/',
   path: '/events/',
@@ -111,6 +118,11 @@ const ScanEventIdRoute = ScanEventIdRouteImport.update({
 const TCodeRoute = TCodeRouteImport.update({
   id: '/t/$code',
   path: '/t/$code',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const UploadsBestandRoute = UploadsBestandRouteImport.update({
+  id: '/uploads/$bestand',
+  path: '/uploads/$bestand',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminEventsIndexRoute = AdminEventsIndexRouteImport.update({
@@ -157,12 +169,14 @@ export interface FileRoutesByFullPath {
   '/mijn-ticket': typeof MijnTicketRouteWithChildren
   '/profiel': typeof ProfielRoute
   '/word-organisator': typeof WordOrganisatorRoute
+  '/api/cover': typeof ApiCoverRoute
   '/events/$eventId': typeof EventsEventIdRoute
   '/events/new': typeof EventsNewRoute
   '/mijn-ticket/$eventId': typeof MijnTicketEventIdRoute
   '/s/$token': typeof STokenRoute
   '/scan/$eventId': typeof ScanEventIdRoute
   '/t/$code': typeof TCodeRoute
+  '/uploads/$bestand': typeof UploadsBestandRoute
   '/admin/': typeof AdminIndexRoute
   '/events/': typeof EventsIndexRoute
   '/platform/': typeof PlatformIndexRoute
@@ -180,12 +194,14 @@ export interface FileRoutesByTo {
   '/mijn-ticket': typeof MijnTicketRouteWithChildren
   '/profiel': typeof ProfielRoute
   '/word-organisator': typeof WordOrganisatorRoute
+  '/api/cover': typeof ApiCoverRoute
   '/events/$eventId': typeof EventsEventIdRoute
   '/events/new': typeof EventsNewRoute
   '/mijn-ticket/$eventId': typeof MijnTicketEventIdRoute
   '/s/$token': typeof STokenRoute
   '/scan/$eventId': typeof ScanEventIdRoute
   '/t/$code': typeof TCodeRoute
+  '/uploads/$bestand': typeof UploadsBestandRoute
   '/admin': typeof AdminIndexRoute
   '/events': typeof EventsIndexRoute
   '/platform': typeof PlatformIndexRoute
@@ -206,12 +222,14 @@ export interface FileRoutesById {
   '/mijn-ticket': typeof MijnTicketRouteWithChildren
   '/profiel': typeof ProfielRoute
   '/word-organisator': typeof WordOrganisatorRoute
+  '/api/cover': typeof ApiCoverRoute
   '/events/$eventId': typeof EventsEventIdRoute
   '/events/new': typeof EventsNewRoute
   '/mijn-ticket/$eventId': typeof MijnTicketEventIdRoute
   '/s/$token': typeof STokenRoute
   '/scan/$eventId': typeof ScanEventIdRoute
   '/t/$code': typeof TCodeRoute
+  '/uploads/$bestand': typeof UploadsBestandRoute
   '/admin/': typeof AdminIndexRoute
   '/events/': typeof EventsIndexRoute
   '/platform/': typeof PlatformIndexRoute
@@ -233,12 +251,14 @@ export interface FileRouteTypes {
     | '/mijn-ticket'
     | '/profiel'
     | '/word-organisator'
+    | '/api/cover'
     | '/events/$eventId'
     | '/events/new'
     | '/mijn-ticket/$eventId'
     | '/s/$token'
     | '/scan/$eventId'
     | '/t/$code'
+    | '/uploads/$bestand'
     | '/admin/'
     | '/events/'
     | '/platform/'
@@ -256,12 +276,14 @@ export interface FileRouteTypes {
     | '/mijn-ticket'
     | '/profiel'
     | '/word-organisator'
+    | '/api/cover'
     | '/events/$eventId'
     | '/events/new'
     | '/mijn-ticket/$eventId'
     | '/s/$token'
     | '/scan/$eventId'
     | '/t/$code'
+    | '/uploads/$bestand'
     | '/admin'
     | '/events'
     | '/platform'
@@ -281,12 +303,14 @@ export interface FileRouteTypes {
     | '/mijn-ticket'
     | '/profiel'
     | '/word-organisator'
+    | '/api/cover'
     | '/events/$eventId'
     | '/events/new'
     | '/mijn-ticket/$eventId'
     | '/s/$token'
     | '/scan/$eventId'
     | '/t/$code'
+    | '/uploads/$bestand'
     | '/admin/'
     | '/events/'
     | '/platform/'
@@ -307,11 +331,13 @@ export interface RootRouteChildren {
   MijnTicketRoute: typeof MijnTicketRouteWithChildren
   ProfielRoute: typeof ProfielRoute
   WordOrganisatorRoute: typeof WordOrganisatorRoute
+  ApiCoverRoute: typeof ApiCoverRoute
   EventsEventIdRoute: typeof EventsEventIdRoute
   EventsNewRoute: typeof EventsNewRoute
   STokenRoute: typeof STokenRoute
   ScanEventIdRoute: typeof ScanEventIdRoute
   TCodeRoute: typeof TCodeRoute
+  UploadsBestandRoute: typeof UploadsBestandRoute
   EventsIndexRoute: typeof EventsIndexRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   TCodeQrRoute: typeof TCodeQrRoute
@@ -375,6 +401,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminIndexRouteImport
       parentRoute: typeof AdminRouteRoute
     }
+    '/api/cover': {
+      id: '/api/cover'
+      path: '/api/cover'
+      fullPath: '/api/cover'
+      preLoaderRoute: typeof ApiCoverRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/events/': {
       id: '/events/'
       path: '/events'
@@ -429,6 +462,13 @@ declare module '@tanstack/react-router' {
       path: '/t/$code'
       fullPath: '/t/$code'
       preLoaderRoute: typeof TCodeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/uploads/$bestand': {
+      id: '/uploads/$bestand'
+      path: '/uploads/$bestand'
+      fullPath: '/uploads/$bestand'
+      preLoaderRoute: typeof UploadsBestandRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/events/': {
@@ -537,11 +577,13 @@ const rootRouteChildren: RootRouteChildren = {
   MijnTicketRoute: MijnTicketRouteWithChildren,
   ProfielRoute: ProfielRoute,
   WordOrganisatorRoute: WordOrganisatorRoute,
+  ApiCoverRoute: ApiCoverRoute,
   EventsEventIdRoute: EventsEventIdRoute,
   EventsNewRoute: EventsNewRoute,
   STokenRoute: STokenRoute,
   ScanEventIdRoute: ScanEventIdRoute,
   TCodeRoute: TCodeRoute,
+  UploadsBestandRoute: UploadsBestandRoute,
   EventsIndexRoute: EventsIndexRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   TCodeQrRoute: TCodeQrRoute,

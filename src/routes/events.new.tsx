@@ -1,6 +1,7 @@
 import { createFileRoute, Link, redirect, useNavigate } from '@tanstack/react-router'
 import { useState } from 'react'
 import { SiteNav, SitePage, stripe } from '#/components/discovery/site'
+import { CoverUpload } from '#/components/cover-upload'
 import { createFullEvent } from '#/server/events'
 import type { FullEventInput } from '#/server/events'
 import { getCurrentUser } from '#/server/session'
@@ -70,6 +71,7 @@ function OrganiseerEvent() {
     location: 'Torarica Hotel, Paramaribo',
     organizer: 'Jouw Naam',
   })
+  const [cover, setCover] = useState('')
   const [lineupName, setLineupName] = useState('')
   const [lineupRole, setLineupRole] = useState('DJ')
   const [lineup, setLineup] = useState<Array<LineupEntry>>([
@@ -131,6 +133,7 @@ function OrganiseerEvent() {
       datum_start: combineerISO(form.dateStart, form.timeStart),
       datum_eind: combineerISO(form.dateEnd, form.timeEnd),
       locatie: form.location || null,
+      cover_afbeelding_url: cover || null,
       status,
       tiers: tiers.map((t) => ({
         naam: t.name,
@@ -270,24 +273,7 @@ function OrganiseerEvent() {
               </Field>
 
               <Field label="Cover-afbeelding">
-                <div className="rounded-[14px] border-2 border-dashed border-[#CBD5E1] bg-[#F8FAFC] p-8 text-center">
-                  <svg
-                    width="30"
-                    height="30"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="#94A3B8"
-                    strokeWidth="1.8"
-                    className="mx-auto mb-2.5 block"
-                  >
-                    <path d="M12 16V4M12 4 7 9M12 4l5 5" />
-                    <path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" />
-                  </svg>
-                  <div className="text-[13.5px] font-bold text-[#334155]">
-                    Sleep een afbeelding hierheen of klik om te uploaden
-                  </div>
-                  <div className="mt-1 text-[12px] text-[#94A3B8]">PNG, JPG tot 5MB — aanbevolen 1200×600</div>
-                </div>
+                <CoverUpload value={cover} onChange={setCover} groot />
               </Field>
 
               <div className="grid gap-5 sm:grid-cols-2">
@@ -505,7 +491,14 @@ function OrganiseerEvent() {
         {/* Stap 3 — Controleren & Publiceren */}
         {step === 3 && (
           <div>
-            <div className="relative mb-6 h-[220px] overflow-hidden rounded-[18px]" style={stripe('#1E293B', '#0F172A')}>
+            <div
+              className="relative mb-6 h-[220px] overflow-hidden rounded-[18px]"
+              style={
+                cover
+                  ? { backgroundImage: `url(${cover})`, backgroundSize: 'cover', backgroundPosition: 'center' }
+                  : stripe('#1E293B', '#0F172A')
+              }
+            >
               <div className="absolute inset-0 bg-[linear-gradient(transparent_30%,rgba(0,0,0,0.75))]" />
               <div className="absolute bottom-5 left-6 text-white">
                 <div className="mb-1.5 text-[24px] font-extrabold">{form.title || 'Naamloos Event'}</div>

@@ -22,6 +22,8 @@ const PUBLIEK = 'actief'
 export type PublicEventCard = {
   id: string
   categorie: string | null
+  // Geüploade cover; null = de categorie-placeholder uit `coverStyle`.
+  cover: string | null
   titel: string
   dateLine: string
   // ISO-startdatum, zodat de client op datum kan filteren en sorteren.
@@ -71,6 +73,7 @@ export const listPublicEvents = createServerFn({ method: 'GET' }).handler(async 
     return {
       id: e.id,
       categorie: e.categorie,
+      cover: e.cover_afbeelding_url,
       titel: e.naam,
       dateLine: formatDateLine(e.datum_start),
       datumStart: e.datum_start.toISOString(),
@@ -89,6 +92,7 @@ export type PublicEventDetail = {
   timeRange: string
   locatie: string | null
   categorie: string | null
+  cover: string | null
   organisator: string
   prijsVanafSrd: number | null
   paragrafen: Array<string>
@@ -115,6 +119,7 @@ export const getPublicEvent = createServerFn({ method: 'GET' })
         datum_eind: events.datum_eind,
         locatie: events.locatie,
         categorie: events.categorie,
+        cover_afbeelding_url: events.cover_afbeelding_url,
         beschrijving: events.beschrijving,
         organisator: organizations.naam,
       })
@@ -144,6 +149,7 @@ export const getPublicEvent = createServerFn({ method: 'GET' })
       timeRange: formatTimeRange(e.datum_start, e.datum_eind),
       locatie: e.locatie,
       categorie: e.categorie,
+      cover: e.cover_afbeelding_url,
       organisator: e.organisator,
       prijsVanafSrd,
       paragrafen: (e.beschrijving ?? '')

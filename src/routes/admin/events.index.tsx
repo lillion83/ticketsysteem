@@ -2,6 +2,7 @@ import { Link, createFileRoute, useRouter } from '@tanstack/react-router'
 import { useState } from 'react'
 import { createEvent, listEvents } from '#/server/events'
 import { eventCategories } from '#/components/discovery/data'
+import { CoverUpload } from '#/components/cover-upload'
 
 type Categorie = (typeof eventCategories)[number]
 
@@ -110,8 +111,8 @@ function EventsOverzicht() {
           <Veld label="Beschrijving (publiek)">
             <textarea value={beschrijving} onChange={(e) => setBeschrijving(e.target.value)} rows={3} className={inputCls} />
           </Veld>
-          <Veld label="Cover-afbeelding URL (publiek)">
-            <input value={coverUrl} onChange={(e) => setCoverUrl(e.target.value)} placeholder="https://…" className={inputCls} />
+          <Veld label="Cover-afbeelding (publiek)">
+            <CoverUpload value={coverUrl} onChange={setCoverUrl} />
           </Veld>
           <label className="flex items-center gap-2 text-[14px]">
             <input type="checkbox" checked={reEntry} onChange={(e) => setReEntry(e.target.checked)} className="h-4 w-4 accent-[#2563EB]" />
