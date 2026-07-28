@@ -76,6 +76,21 @@ export const BANNER_RATIO = 2
  *
  * `children` (verlooplaag, titel) ligt bovenop; de aanroeper bepaalt de hoogte.
  */
+/**
+ * Uitvergrote, vervaagde versie van de afbeelding als achtergrond, zodat er
+ * naast een niet-passende flyer geen kale marges staan. Het opschalen houdt de
+ * vervaagde randen buiten beeld. Puur decor, dus aria-hidden.
+ */
+function BlurAchtergrond({ cover }: { cover: string }) {
+  return (
+    <div
+      aria-hidden
+      className="absolute inset-0 scale-125 bg-cover bg-center blur-2xl brightness-[.55]"
+      style={{ backgroundImage: `url(${cover})` }}
+    />
+  )
+}
+
 export function EventBanner({
   categorie,
   cover,
@@ -93,32 +108,121 @@ export function EventBanner({
   className?: string
   children?: ReactNode
 }) {
+  const [lightboxOpen, setLightboxOpen] = useState(false)
   const ratio = cover && breedte && hoogte ? breedte / hoogte : null
   const heelTonen = ratio !== null && ratio < BANNER_RATIO
 
-  if (!heelTonen) {
-    return (
-      <div className={className} style={coverStyle(categorie, cover, focus)}>
+  return (
+    <>
+      <div
+        className={heelTonen ? `bg-[#0F172A] ${className}` : className}
+        style={heelTonen ? undefined : coverStyle(categorie, cover, focus)}
+      >
+        {heelTonen && cover && (
+          <>
+            <BlurAchtergrond cover={cover} />
+            <img src={cover} alt="" className="absolute inset-0 h-full w-full object-contain" />
+          </>
+        )}
         {children}
+        {/* Organisatoren zetten prijzen, line-up en tijden ín de flyer. Ook een
+            nette crop kan daar iets van afsnijden, dus altijd een uitweg naar
+            de hele flyer — ook in contain-modus, want ook dan kan de flyer te
+            klein zijn om alles te lezen. Een <button> is vanzelf met het
+            toetsenbord te bedienen; de knop ligt over de hele banner. */}
+        {cover && (
+          <button
+            type="button"
+            onClick={() => setLightboxOpen(true)}
+            aria-label="Bekijk volledige flyer"
+            className="absolute inset-0 flex cursor-pointer items-end justify-end"
+          >
+            <span
+              aria-hidden
+              className="absolute inset-x-0 bottom-0 h-1/3 bg-[linear-gradient(transparent,rgba(15,23,42,0.7))]"
+            />
+            <span className="relative m-4 inline-flex items-center gap-2 rounded-full bg-black/45 px-3.5 py-2 text-[13px] font-bold text-white">
+              <ExpandIcon />
+              Bekijk volledige flyer
+            </span>
+          </button>
+        )}
       </div>
-    )
-  }
+
+      {lightboxOpen && cover && <FlyerLightbox cover={cover} onClose={() => setLightboxOpen(false)} />}
+    </>
+  )
+}
+
+/**
+ * De hele flyer, niets afgesneden. Zelfde opzet als ReserveerModal (overlay met
+ * klik-buiten-sluit, role="dialog"), aangevuld met Escape en een focus trap —
+ * er valt hier weinig te focussen, dus die mag niet naar de pagina eronder
+ * weglopen.
+ */
+function FlyerLightbox({ cover, onClose }: { cover: string; onClose: () => void }) {
+  const dialoog = useRef<HTMLDivElement>(null)
+  const sluitKnop = useRef<HTMLButtonElement>(null)
+
+  useEffect(() => {
+    // Focus naar de sluitknop, en terug naar waar hij vandaan kwam bij sluiten.
+    const vorige = document.activeElement as HTMLElement | null
+    sluitKnop.current?.focus()
+
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        onClose()
+        return
+      }
+      if (e.key !== 'Tab') return
+      const focusbaar = dialoog.current?.querySelectorAll<HTMLElement>(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+      )
+      if (!focusbaar || focusbaar.length === 0) return
+      const eerste = focusbaar[0]
+      const laatste = focusbaar[focusbaar.length - 1]
+      if (e.shiftKey && document.activeElement === eerste) {
+        e.preventDefault()
+        laatste.focus()
+      } else if (!e.shiftKey && document.activeElement === laatste) {
+        e.preventDefault()
+        eerste.focus()
+      }
+    }
+
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('keydown', onKeyDown)
+      vorige?.focus()
+    }
+  }, [onClose])
 
   return (
-    <div className={`bg-[#0F172A] ${className}`}>
-      {/* Achtergrond: dezelfde afbeelding, uitvergroot en vervaagd. Het opschalen
-          houdt de vervaagde randen buiten beeld. aria-hidden: puur decor. */}
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden bg-black/80 p-4"
+      onClick={onClose}
+      role="presentation"
+    >
+      <BlurAchtergrond cover={cover} />
       <div
-        aria-hidden
-        className="absolute inset-0 scale-125 bg-cover bg-center blur-2xl brightness-[.55]"
-        style={{ backgroundImage: `url(${cover})` }}
-      />
-      <img
-        src={cover ?? ''}
-        alt=""
-        className="absolute inset-0 h-full w-full object-contain"
-      />
-      {children}
+        ref={dialoog}
+        className="relative flex h-full w-full max-w-[1100px] items-center justify-center"
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Volledige flyer"
+      >
+        <img src={cover} alt="Volledige flyer" className="max-h-full max-w-full object-contain" />
+        <button
+          ref={sluitKnop}
+          type="button"
+          onClick={onClose}
+          aria-label="Sluiten"
+          className="absolute right-0 top-0 flex h-10 w-10 items-center justify-center rounded-full bg-black/55 text-[18px] font-bold text-white hover:bg-black/75"
+        >
+          ✕
+        </button>
+      </div>
     </div>
   )
 }
@@ -140,6 +244,25 @@ export function BellIcon({ stroke = '#fff' }: IconProps) {
     >
       <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
       <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+    </svg>
+  )
+}
+
+export function ExpandIcon({
+  stroke = '#fff',
+  size = 15,
+}: IconProps & { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={stroke}
+      strokeWidth="2.2"
+      strokeLinecap="round"
+    >
+      <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
     </svg>
   )
 }
