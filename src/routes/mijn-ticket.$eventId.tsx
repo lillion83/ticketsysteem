@@ -32,6 +32,8 @@ export const Route = createFileRoute('/mijn-ticket/$eventId')({
         locatie: eerste.locatie,
         categorie: eerste.categorie,
         cover: eerste.cover,
+        coverFocusX: eerste.coverFocusX,
+        coverFocusY: eerste.coverFocusY,
       },
       tickets,
     }
@@ -66,7 +68,10 @@ function EventTickets() {
         <div className="mb-8 flex items-center gap-4">
           <div
             className="h-[64px] w-[64px] shrink-0 rounded-[12px]"
-            style={coverStyle(event.categorie, event.cover)}
+            style={coverStyle(event.categorie, event.cover, {
+              x: event.coverFocusX,
+              y: event.coverFocusY,
+            })}
           />
           <div className="min-w-0">
             <h1 className="text-[24px] font-extrabold leading-tight">

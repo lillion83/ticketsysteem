@@ -137,6 +137,8 @@ function OrganiseerEvent() {
       cover_afbeelding_url: cover.url || null,
       cover_breedte: cover.breedte,
       cover_hoogte: cover.hoogte,
+      cover_focus_x: cover.focusX,
+      cover_focus_y: cover.focusY,
       status,
       tiers: tiers.map((t) => ({
         naam: t.name,

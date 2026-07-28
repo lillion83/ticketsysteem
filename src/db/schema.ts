@@ -169,6 +169,11 @@ export const events = pgTable(
     // banner valt dan terug op bijsnijden (het oude gedrag).
     cover_breedte: integer('cover_breedte'),
     cover_hoogte: integer('cover_hoogte'),
+    // Focuspunt in procenten (0–100), door de organisator aangeklikt: het punt
+    // dat in beeld moet blijven als de cover wordt bijgesneden. Nullable = het
+    // midden, wat het gedrag is van vóór deze kolommen.
+    cover_focus_x: integer('cover_focus_x'),
+    cover_focus_y: integer('cover_focus_y'),
     aangemaakt_op: timestamp('aangemaakt_op', { withTimezone: true })
       .notNull()
       .defaultNow(),

@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import { BANNER_RATIO } from '#/components/discovery/site'
 
 // Cover-afbeelding uploaden: klikken of slepen. Stuurt het bestand naar
 // /api/cover en geeft het opgeslagen pad terug via `onChange`. De url is
@@ -9,9 +10,19 @@ export type Cover = {
   url: string
   breedte: number | null
   hoogte: number | null
+  // Focuspunt in procenten: het punt dat in beeld blijft bij bijsnijden.
+  // null = midden.
+  focusX: number | null
+  focusY: number | null
 }
 
-export const LEGE_COVER: Cover = { url: '', breedte: null, hoogte: null }
+export const LEGE_COVER: Cover = {
+  url: '',
+  breedte: null,
+  hoogte: null,
+  focusX: null,
+  focusY: null,
+}
 
 type Props = {
   value: Cover
@@ -36,10 +47,13 @@ export function CoverUpload({ value, onChange, groot }: Props) {
       const res = await fetch('/api/cover', { method: 'POST', body })
       const data = (await res.json()) as Partial<Cover> & { error?: string }
       if (!res.ok || !data.url) throw new Error(data.error ?? 'Upload mislukt')
+      // Nieuwe afbeelding = focuspunt terug naar het midden.
       onChange({
         url: data.url,
         breedte: data.breedte ?? null,
         hoogte: data.hoogte ?? null,
+        focusX: null,
+        focusY: null,
       })
     } catch (err) {
       setFout(err instanceof Error ? err.message : 'Upload mislukt')
@@ -49,6 +63,26 @@ export function CoverUpload({ value, onChange, groot }: Props) {
       if (inputRef.current) inputRef.current.value = ''
     }
   }
+
+  // Waar in de afbeelding is geklikt, in procenten van de weergegeven maat.
+  // De afbeelding staat als `contain` in beeld, dus de klikpositie in het vlak
+  // is één op één de positie in de afbeelding.
+  function kiesFocus(e: React.MouseEvent<HTMLButtonElement>) {
+    const vlak = e.currentTarget.getBoundingClientRect()
+    const pct = (waarde: number, maat: number) =>
+      Math.min(100, Math.max(0, Math.round((waarde / maat) * 100)))
+    onChange({
+      ...value,
+      focusX: pct(e.clientX - vlak.left, vlak.width),
+      focusY: pct(e.clientY - vlak.top, vlak.height),
+    })
+  }
+
+  // Of de banner deze afbeelding bijsnijdt (breed genoeg) of hem heel toont.
+  // Bepaalt alleen de uitleg eronder; het focuspunt telt sowieso mee in de
+  // kleinere weergaves, die altijd bijsnijden.
+  const bannerSnijdtBij =
+    !value.breedte || !value.hoogte || value.breedte / value.hoogte >= BANNER_RATIO
 
   const hoogte = groot ? 'h-[190px]' : 'h-[130px]'
 
@@ -64,10 +98,27 @@ export function CoverUpload({ value, onChange, groot }: Props) {
 
       {value.url ? (
         <div className="flex flex-col gap-2">
-          <div
-            className={`w-full overflow-hidden rounded-[14px] border border-[#E5E7EB] bg-[#F1F5F9] bg-cover bg-center ${hoogte}`}
+          {/* De hele afbeelding in beeld (contain), zodat de organisator het
+              focuspunt kiest op wat hij zelf gemaakt heeft — niet op een al
+              bijgesneden versie. */}
+          <button
+            type="button"
+            onClick={kiesFocus}
+            title="Klik op het punt dat zichtbaar moet blijven"
+            className={`relative w-full cursor-crosshair overflow-hidden rounded-[14px] border border-[#E5E7EB] bg-[#F1F5F9] bg-contain bg-center bg-no-repeat ${hoogte}`}
             style={{ backgroundImage: `url(${value.url})` }}
-          />
+          >
+            <span
+              aria-hidden
+              className="absolute h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-[#2563EB] shadow-[0_0_0_2px_rgba(37,99,235,0.35)]"
+              style={{ left: `${value.focusX ?? 50}%`, top: `${value.focusY ?? 50}%` }}
+            />
+          </button>
+          <p className="text-[12px] text-[#64748B]">
+            {bannerSnijdtBij
+              ? 'Deze afbeelding wordt bijgesneden in de banner. Klik erop om te kiezen welk punt zichtbaar blijft — standaard het midden.'
+              : 'In de banner blijft deze flyer helemaal zichtbaar. In het events-overzicht wordt hij wél bijgesneden: klik om te kiezen welk punt daar zichtbaar blijft.'}
+          </p>
           <div className="flex gap-3">
             <button
               type="button"

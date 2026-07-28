@@ -24,6 +24,9 @@ export type PublicEventCard = {
   categorie: string | null
   // Geüploade cover; null = de categorie-placeholder uit `coverStyle`.
   cover: string | null
+  // Focuspunt van de cover (procenten); null = midden.
+  coverFocusX: number | null
+  coverFocusY: number | null
   titel: string
   dateLine: string
   // ISO-startdatum, zodat de client op datum kan filteren en sorteren.
@@ -74,6 +77,8 @@ export const listPublicEvents = createServerFn({ method: 'GET' }).handler(async 
       id: e.id,
       categorie: e.categorie,
       cover: e.cover_afbeelding_url,
+      coverFocusX: e.cover_focus_x,
+      coverFocusY: e.cover_focus_y,
       titel: e.naam,
       dateLine: formatDateLine(e.datum_start),
       datumStart: e.datum_start.toISOString(),
@@ -96,6 +101,8 @@ export type PublicEventDetail = {
   // Afmetingen van de cover; null = onbekend, de banner snijdt dan bij.
   coverBreedte: number | null
   coverHoogte: number | null
+  coverFocusX: number | null
+  coverFocusY: number | null
   organisator: string
   prijsVanafSrd: number | null
   paragrafen: Array<string>
@@ -125,6 +132,8 @@ export const getPublicEvent = createServerFn({ method: 'GET' })
         cover_afbeelding_url: events.cover_afbeelding_url,
         cover_breedte: events.cover_breedte,
         cover_hoogte: events.cover_hoogte,
+        cover_focus_x: events.cover_focus_x,
+        cover_focus_y: events.cover_focus_y,
         beschrijving: events.beschrijving,
         organisator: organizations.naam,
       })
@@ -157,6 +166,8 @@ export const getPublicEvent = createServerFn({ method: 'GET' })
       cover: e.cover_afbeelding_url,
       coverBreedte: e.cover_breedte,
       coverHoogte: e.cover_hoogte,
+      coverFocusX: e.cover_focus_x,
+      coverFocusY: e.cover_focus_y,
       organisator: e.organisator,
       prijsVanafSrd,
       paragrafen: (e.beschrijving ?? '')

@@ -47,6 +47,9 @@ export type EventInput = {
   // Afmetingen van de cover (uit de upload). null = onbekend, banner snijdt bij.
   cover_breedte: number | null
   cover_hoogte: number | null
+  // Aangeklikt focuspunt in procenten; null = midden.
+  cover_focus_x: number | null
+  cover_focus_y: number | null
 }
 
 function parseEventInput(data: EventInput): EventInput {
@@ -60,7 +63,14 @@ function parseEventInput(data: EventInput): EventInput {
   if (data.categorie !== null && !eventCategorie.enumValues.includes(data.categorie)) {
     throw new Error('Ongeldige categorie')
   }
-  return data
+  // Focuspunt komt uit een klik in de browser: afdwingen dat het 0–100 blijft.
+  const inBereik = (n: number | null) =>
+    n === null || Number.isNaN(n) ? null : Math.min(100, Math.max(0, Math.round(n)))
+  return {
+    ...data,
+    cover_focus_x: inBereik(data.cover_focus_x),
+    cover_focus_y: inBereik(data.cover_focus_y),
+  }
 }
 
 export const createEvent = createServerFn({ method: 'POST' })
@@ -82,6 +92,8 @@ export const createEvent = createServerFn({ method: 'POST' })
         cover_afbeelding_url: data.cover_afbeelding_url?.trim() || null,
         cover_breedte: data.cover_breedte,
         cover_hoogte: data.cover_hoogte,
+        cover_focus_x: data.cover_focus_x,
+        cover_focus_y: data.cover_focus_y,
       })
       .returning()
     return event
@@ -102,6 +114,8 @@ export type FullEventInput = {
   cover_afbeelding_url: string | null
   cover_breedte: number | null
   cover_hoogte: number | null
+  cover_focus_x: number | null
+  cover_focus_y: number | null
   status: 'concept' | 'actief'
   tiers: Array<{ naam: string; prijs_srd: string; aantal_beschikbaar: string; features: Array<string> }>
   sprekers: Array<{ naam: string; rol: string | null }>
@@ -120,6 +134,8 @@ function parseFullEventInput(data: FullEventInput): FullEventInput {
     cover_afbeelding_url: data.cover_afbeelding_url,
     cover_breedte: data.cover_breedte,
     cover_hoogte: data.cover_hoogte,
+    cover_focus_x: data.cover_focus_x,
+    cover_focus_y: data.cover_focus_y,
   })
   // Alleen tiers met een naam tellen mee; hun prijs en aantal moeten geldig zijn.
   const tiers = data.tiers.filter((t) => t.naam.trim())
@@ -156,6 +172,8 @@ export const createFullEvent = createServerFn({ method: 'POST' })
           cover_afbeelding_url: data.cover_afbeelding_url?.trim() || null,
           cover_breedte: data.cover_breedte,
           cover_hoogte: data.cover_hoogte,
+          cover_focus_x: data.cover_focus_x,
+          cover_focus_y: data.cover_focus_y,
         })
         .returning()
 
@@ -211,6 +229,8 @@ export const updateEvent = createServerFn({ method: 'POST' })
         cover_afbeelding_url: data.cover_afbeelding_url?.trim() || null,
         cover_breedte: data.cover_breedte,
         cover_hoogte: data.cover_hoogte,
+        cover_focus_x: data.cover_focus_x,
+        cover_focus_y: data.cover_focus_y,
       })
       .where(
         and(eq(events.id, data.id), eq(events.organization_id, organizationId)),

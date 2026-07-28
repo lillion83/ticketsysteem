@@ -35,15 +35,24 @@ const categoryColors: Record<string, [string, string]> = {
   'Food & Drink': ['#FFFBEB', '#FEF3C7'],
 }
 
+// Het punt dat in beeld blijft als er bijgesneden wordt. De organisator klikt
+// het aan bij de upload; zonder keuze is het het midden (het oude gedrag).
+export type Focus = { x: number | null; y: number | null }
+
+export function focusPositie(focus?: Focus | null): string {
+  return `${focus?.x ?? 50}% ${focus?.y ?? 50}%`
+}
+
 export function coverStyle(
   categorie: string | null,
   cover?: string | null,
+  focus?: Focus | null,
 ): CSSProperties {
   if (cover)
     return {
       backgroundImage: `url(${cover})`,
       backgroundSize: 'cover',
-      backgroundPosition: 'center',
+      backgroundPosition: focusPositie(focus),
     }
   const [a, b] = categoryColors[categorie ?? ''] ?? ['#F1F5F9', '#E2E8F0']
   return stripe(a, b)
@@ -53,7 +62,7 @@ export function coverStyle(
 // dat er iets wezenlijks wegvalt. Alles daaronder — vierkante Instagram-posts,
 // portrait stories, 4:3-flyers — zou hard afgesneden worden, vaak precies door
 // de titel of de line-up heen.
-const BANNER_RATIO = 2
+export const BANNER_RATIO = 2
 
 /**
  * De banner boven een event. Flyers komen van social media en hebben sterk
@@ -72,6 +81,7 @@ export function EventBanner({
   cover,
   breedte,
   hoogte,
+  focus,
   className = '',
   children,
 }: {
@@ -79,6 +89,7 @@ export function EventBanner({
   cover?: string | null
   breedte?: number | null
   hoogte?: number | null
+  focus?: Focus | null
   className?: string
   children?: ReactNode
 }) {
@@ -87,7 +98,7 @@ export function EventBanner({
 
   if (!heelTonen) {
     return (
-      <div className={className} style={coverStyle(categorie, cover)}>
+      <div className={className} style={coverStyle(categorie, cover, focus)}>
         {children}
       </div>
     )

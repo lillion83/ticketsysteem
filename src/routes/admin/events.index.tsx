@@ -51,6 +51,8 @@ function EventsOverzicht() {
           cover_afbeelding_url: cover.url || null,
           cover_breedte: cover.breedte,
           cover_hoogte: cover.hoogte,
+          cover_focus_x: cover.focusX,
+          cover_focus_y: cover.focusY,
         },
       })
       setOpen(false)

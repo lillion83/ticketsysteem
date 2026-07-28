@@ -113,6 +113,8 @@ function EventSectie() {
     url: event.cover_afbeelding_url ?? '',
     breedte: event.cover_breedte,
     hoogte: event.cover_hoogte,
+    focusX: event.cover_focus_x,
+    focusY: event.cover_focus_y,
   })
   const [fout, setFout] = useState<string | null>(null)
   const [ok, setOk] = useState(false)
@@ -136,6 +138,8 @@ function EventSectie() {
           cover_afbeelding_url: cover.url || null,
           cover_breedte: cover.breedte,
           cover_hoogte: cover.hoogte,
+          cover_focus_x: cover.focusX,
+          cover_focus_y: cover.focusY,
         },
       })
       setOk(true)

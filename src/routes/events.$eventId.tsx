@@ -66,6 +66,7 @@ function EventDetailPage() {
           cover={detail.cover}
           breedte={detail.coverBreedte}
           hoogte={detail.coverHoogte}
+          focus={{ x: detail.coverFocusX, y: detail.coverFocusY }}
           className="relative mb-9 h-[380px] overflow-hidden rounded-[20px]"
         >
           <div className="absolute inset-0 bg-[linear-gradient(transparent_40%,rgba(0,0,0,0.75))]" />

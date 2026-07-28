@@ -18,6 +18,8 @@ export type MijnTicket = {
   locatie: string | null
   categorie: string | null
   cover: string | null
+  coverFocusX: number | null
+  coverFocusY: number | null
   type_naam: string
   status: MijnTicketStatus
   gebruikt_op: Date | null
@@ -67,6 +69,8 @@ export const listMijnTickets = createServerFn({ method: 'GET' }).handler(
         locatie: events.locatie,
         categorie: events.categorie,
         cover: events.cover_afbeelding_url,
+        cover_focus_x: events.cover_focus_x,
+        cover_focus_y: events.cover_focus_y,
       })
       .from(tickets)
       .innerJoin(ticketTypes, eq(tickets.ticket_type_id, ticketTypes.id))
@@ -82,6 +86,8 @@ export const listMijnTickets = createServerFn({ method: 'GET' }).handler(
       locatie: r.locatie,
       categorie: r.categorie,
       cover: r.cover,
+      coverFocusX: r.cover_focus_x,
+      coverFocusY: r.cover_focus_y,
       type_naam: r.type_naam,
       status: r.ingetrokken_op
         ? 'ingetrokken'
