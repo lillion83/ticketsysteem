@@ -1,7 +1,8 @@
 import { createFileRoute, Link, redirect, useNavigate } from '@tanstack/react-router'
 import { useState } from 'react'
 import { SiteNav, SitePage, stripe } from '#/components/discovery/site'
-import { CoverUpload } from '#/components/cover-upload'
+import { CoverUpload, LEGE_COVER } from '#/components/cover-upload'
+import type { Cover } from '#/components/cover-upload'
 import { createFullEvent } from '#/server/events'
 import type { FullEventInput } from '#/server/events'
 import { getCurrentUser } from '#/server/session'
@@ -71,7 +72,7 @@ function OrganiseerEvent() {
     location: 'Torarica Hotel, Paramaribo',
     organizer: 'Jouw Naam',
   })
-  const [cover, setCover] = useState('')
+  const [cover, setCover] = useState<Cover>(LEGE_COVER)
   const [lineupName, setLineupName] = useState('')
   const [lineupRole, setLineupRole] = useState('DJ')
   const [lineup, setLineup] = useState<Array<LineupEntry>>([
@@ -133,7 +134,9 @@ function OrganiseerEvent() {
       datum_start: combineerISO(form.dateStart, form.timeStart),
       datum_eind: combineerISO(form.dateEnd, form.timeEnd),
       locatie: form.location || null,
-      cover_afbeelding_url: cover || null,
+      cover_afbeelding_url: cover.url || null,
+      cover_breedte: cover.breedte,
+      cover_hoogte: cover.hoogte,
       status,
       tiers: tiers.map((t) => ({
         naam: t.name,
@@ -494,8 +497,8 @@ function OrganiseerEvent() {
             <div
               className="relative mb-6 h-[220px] overflow-hidden rounded-[18px]"
               style={
-                cover
-                  ? { backgroundImage: `url(${cover})`, backgroundSize: 'cover', backgroundPosition: 'center' }
+                cover.url
+                  ? { backgroundImage: `url(${cover.url})`, backgroundSize: 'cover', backgroundPosition: 'center' }
                   : stripe('#1E293B', '#0F172A')
               }
             >

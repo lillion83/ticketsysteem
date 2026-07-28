@@ -1,6 +1,7 @@
 import {
   boolean,
   index,
+  integer,
   numeric,
   pgEnum,
   pgTable,
@@ -163,6 +164,11 @@ export const events = pgTable(
     categorie: eventCategorie('categorie'),
     beschrijving: text('beschrijving'),
     cover_afbeelding_url: text('cover_afbeelding_url'),
+    // Afmetingen van de cover, gelezen bij de upload. Nullable: events van vóór
+    // deze kolommen en handmatig ingevulde externe URL's hebben ze niet, en de
+    // banner valt dan terug op bijsnijden (het oude gedrag).
+    cover_breedte: integer('cover_breedte'),
+    cover_hoogte: integer('cover_hoogte'),
     aangemaakt_op: timestamp('aangemaakt_op', { withTimezone: true })
       .notNull()
       .defaultNow(),

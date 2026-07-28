@@ -1,12 +1,21 @@
 import { useRef, useState } from 'react'
 
 // Cover-afbeelding uploaden: klikken of slepen. Stuurt het bestand naar
-// /api/cover en geeft het opgeslagen pad terug via `onChange`. De waarde is
+// /api/cover en geeft het opgeslagen pad terug via `onChange`. De url is
 // hetzelfde veld als voorheen (cover_afbeelding_url), alleen vult de gebruiker
-// het niet meer met de hand.
+// het niet meer met de hand. De afmetingen komen mee omdat de banner op de
+// eventpagina daarmee bepaalt of hij de flyer bijsnijdt of heel laat zien.
+export type Cover = {
+  url: string
+  breedte: number | null
+  hoogte: number | null
+}
+
+export const LEGE_COVER: Cover = { url: '', breedte: null, hoogte: null }
+
 type Props = {
-  value: string
-  onChange: (url: string) => void
+  value: Cover
+  onChange: (cover: Cover) => void
   // `groot` = de brede dropzone uit het publieke event-formulier.
   groot?: boolean
 }
@@ -25,9 +34,13 @@ export function CoverUpload({ value, onChange, groot }: Props) {
       const body = new FormData()
       body.append('bestand', file)
       const res = await fetch('/api/cover', { method: 'POST', body })
-      const data = (await res.json()) as { url?: string; error?: string }
+      const data = (await res.json()) as Partial<Cover> & { error?: string }
       if (!res.ok || !data.url) throw new Error(data.error ?? 'Upload mislukt')
-      onChange(data.url)
+      onChange({
+        url: data.url,
+        breedte: data.breedte ?? null,
+        hoogte: data.hoogte ?? null,
+      })
     } catch (err) {
       setFout(err instanceof Error ? err.message : 'Upload mislukt')
     } finally {
@@ -49,11 +62,11 @@ export function CoverUpload({ value, onChange, groot }: Props) {
         onChange={(e) => upload(e.target.files?.[0])}
       />
 
-      {value ? (
+      {value.url ? (
         <div className="flex flex-col gap-2">
           <div
             className={`w-full overflow-hidden rounded-[14px] border border-[#E5E7EB] bg-[#F1F5F9] bg-cover bg-center ${hoogte}`}
-            style={{ backgroundImage: `url(${value})` }}
+            style={{ backgroundImage: `url(${value.url})` }}
           />
           <div className="flex gap-3">
             <button
@@ -66,7 +79,7 @@ export function CoverUpload({ value, onChange, groot }: Props) {
             </button>
             <button
               type="button"
-              onClick={() => onChange('')}
+              onClick={() => onChange(LEGE_COVER)}
               className="text-[13px] font-semibold text-[#DC2626] hover:underline"
             >
               Verwijderen

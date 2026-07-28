@@ -93,6 +93,9 @@ export type PublicEventDetail = {
   locatie: string | null
   categorie: string | null
   cover: string | null
+  // Afmetingen van de cover; null = onbekend, de banner snijdt dan bij.
+  coverBreedte: number | null
+  coverHoogte: number | null
   organisator: string
   prijsVanafSrd: number | null
   paragrafen: Array<string>
@@ -120,6 +123,8 @@ export const getPublicEvent = createServerFn({ method: 'GET' })
         locatie: events.locatie,
         categorie: events.categorie,
         cover_afbeelding_url: events.cover_afbeelding_url,
+        cover_breedte: events.cover_breedte,
+        cover_hoogte: events.cover_hoogte,
         beschrijving: events.beschrijving,
         organisator: organizations.naam,
       })
@@ -150,6 +155,8 @@ export const getPublicEvent = createServerFn({ method: 'GET' })
       locatie: e.locatie,
       categorie: e.categorie,
       cover: e.cover_afbeelding_url,
+      coverBreedte: e.cover_breedte,
+      coverHoogte: e.cover_hoogte,
       organisator: e.organisator,
       prijsVanafSrd,
       paragrafen: (e.beschrijving ?? '')

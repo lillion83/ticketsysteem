@@ -49,6 +49,69 @@ export function coverStyle(
   return stripe(a, b)
 }
 
+// Vanaf deze verhouding (breedte ÷ hoogte) vult een afbeelding de banner zonder
+// dat er iets wezenlijks wegvalt. Alles daaronder — vierkante Instagram-posts,
+// portrait stories, 4:3-flyers — zou hard afgesneden worden, vaak precies door
+// de titel of de line-up heen.
+const BANNER_RATIO = 2
+
+/**
+ * De banner boven een event. Flyers komen van social media en hebben sterk
+ * wisselende formaten, dus kiest de banner zelf hoe hij de afbeelding toont:
+ *
+ * - breed genoeg (≥ 2:1), of afmetingen onbekend → vullen en bijsnijden,
+ *   precies zoals het altijd was (events van vóór de afmeting-kolommen en
+ *   handmatig ingevulde externe URL's blijven zo werken);
+ * - smaller → de hele afbeelding in beeld, met een uitvergrote, vervaagde
+ *   versie van diezelfde afbeelding als achtergrond in plaats van witruimte.
+ *
+ * `children` (verlooplaag, titel) ligt bovenop; de aanroeper bepaalt de hoogte.
+ */
+export function EventBanner({
+  categorie,
+  cover,
+  breedte,
+  hoogte,
+  className = '',
+  children,
+}: {
+  categorie: string | null
+  cover?: string | null
+  breedte?: number | null
+  hoogte?: number | null
+  className?: string
+  children?: ReactNode
+}) {
+  const ratio = cover && breedte && hoogte ? breedte / hoogte : null
+  const heelTonen = ratio !== null && ratio < BANNER_RATIO
+
+  if (!heelTonen) {
+    return (
+      <div className={className} style={coverStyle(categorie, cover)}>
+        {children}
+      </div>
+    )
+  }
+
+  return (
+    <div className={`bg-[#0F172A] ${className}`}>
+      {/* Achtergrond: dezelfde afbeelding, uitvergroot en vervaagd. Het opschalen
+          houdt de vervaagde randen buiten beeld. aria-hidden: puur decor. */}
+      <div
+        aria-hidden
+        className="absolute inset-0 scale-125 bg-cover bg-center blur-2xl brightness-[.55]"
+        style={{ backgroundImage: `url(${cover})` }}
+      />
+      <img
+        src={cover ?? ''}
+        alt=""
+        className="absolute inset-0 h-full w-full object-contain"
+      />
+      {children}
+    </div>
+  )
+}
+
 // ── Iconen (outline-stijl, zoals het ontwerp; geen icon-library) ────────────
 
 type IconProps = { className?: string; stroke?: string }

@@ -44,6 +44,9 @@ export type EventInput = {
   categorie: Categorie | null
   beschrijving: string | null
   cover_afbeelding_url: string | null
+  // Afmetingen van de cover (uit de upload). null = onbekend, banner snijdt bij.
+  cover_breedte: number | null
+  cover_hoogte: number | null
 }
 
 function parseEventInput(data: EventInput): EventInput {
@@ -77,6 +80,8 @@ export const createEvent = createServerFn({ method: 'POST' })
         categorie: data.categorie,
         beschrijving: data.beschrijving?.trim() || null,
         cover_afbeelding_url: data.cover_afbeelding_url?.trim() || null,
+        cover_breedte: data.cover_breedte,
+        cover_hoogte: data.cover_hoogte,
       })
       .returning()
     return event
@@ -95,6 +100,8 @@ export type FullEventInput = {
   datum_eind: string
   locatie: string | null
   cover_afbeelding_url: string | null
+  cover_breedte: number | null
+  cover_hoogte: number | null
   status: 'concept' | 'actief'
   tiers: Array<{ naam: string; prijs_srd: string; aantal_beschikbaar: string; features: Array<string> }>
   sprekers: Array<{ naam: string; rol: string | null }>
@@ -111,6 +118,8 @@ function parseFullEventInput(data: FullEventInput): FullEventInput {
     categorie: data.categorie,
     beschrijving: data.beschrijving,
     cover_afbeelding_url: data.cover_afbeelding_url,
+    cover_breedte: data.cover_breedte,
+    cover_hoogte: data.cover_hoogte,
   })
   // Alleen tiers met een naam tellen mee; hun prijs en aantal moeten geldig zijn.
   const tiers = data.tiers.filter((t) => t.naam.trim())
@@ -145,6 +154,8 @@ export const createFullEvent = createServerFn({ method: 'POST' })
           categorie: data.categorie,
           beschrijving: data.beschrijving?.trim() || null,
           cover_afbeelding_url: data.cover_afbeelding_url?.trim() || null,
+          cover_breedte: data.cover_breedte,
+          cover_hoogte: data.cover_hoogte,
         })
         .returning()
 
@@ -198,6 +209,8 @@ export const updateEvent = createServerFn({ method: 'POST' })
         categorie: data.categorie,
         beschrijving: data.beschrijving?.trim() || null,
         cover_afbeelding_url: data.cover_afbeelding_url?.trim() || null,
+        cover_breedte: data.cover_breedte,
+        cover_hoogte: data.cover_hoogte,
       })
       .where(
         and(eq(events.id, data.id), eq(events.organization_id, organizationId)),

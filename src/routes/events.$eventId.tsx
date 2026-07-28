@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
-import { SiteFooter, SiteNav, SitePage, coverStyle, stripe } from '#/components/discovery/site'
+import { EventBanner, SiteFooter, SiteNav, SitePage, stripe } from '#/components/discovery/site'
 import { formatPrice, useCurrency } from '#/components/discovery/currency'
 import { isFavoriet, toggleFavoriet } from '#/components/discovery/favorites'
 import { getPublicEvent } from '#/server/discovery'
@@ -61,13 +61,19 @@ function EventDetailPage() {
 
       <div className="mx-auto max-w-[1280px] px-6 pb-20 pt-8 md:px-12">
         {/* Hero */}
-        <div className="relative mb-9 h-[380px] overflow-hidden rounded-[20px]" style={coverStyle(detail.categorie, detail.cover)}>
+        <EventBanner
+          categorie={detail.categorie}
+          cover={detail.cover}
+          breedte={detail.coverBreedte}
+          hoogte={detail.coverHoogte}
+          className="relative mb-9 h-[380px] overflow-hidden rounded-[20px]"
+        >
           <div className="absolute inset-0 bg-[linear-gradient(transparent_40%,rgba(0,0,0,0.75))]" />
           <div className="absolute bottom-7 left-8 text-white">
             <h1 className="mb-2 text-[30px] font-extrabold md:text-[38px]">{detail.titel}</h1>
             <div className="text-[14px] opacity-90">{detail.dateLocationLine}</div>
           </div>
-        </div>
+        </EventBanner>
 
         <div className="grid items-start gap-8 md:grid-cols-[1fr_380px]">
           {/* Hoofdinhoud */}
