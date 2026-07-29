@@ -33,6 +33,7 @@ import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as PlatformEventsIndexRouteImport } from './routes/platform/events.index'
 import { Route as PlatformEventsEventIdRouteImport } from './routes/platform/events.$eventId'
 import { Route as TCodeQrRouteImport } from './routes/t.$code_.qr'
+import { Route as AdminEventsEventIdDashboardRouteImport } from './routes/admin/events.$eventId_.dashboard'
 import { Route as AdminEventsEventIdDeurRouteImport } from './routes/admin/events.$eventId_.deur'
 
 const IndexRoute = IndexRouteImport.update({
@@ -155,6 +156,12 @@ const TCodeQrRoute = TCodeQrRouteImport.update({
   path: '/t/$code/qr',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminEventsEventIdDashboardRoute =
+  AdminEventsEventIdDashboardRouteImport.update({
+    id: '/events/$eventId_/dashboard',
+    path: '/events/$eventId/dashboard',
+    getParentRoute: () => AdminRouteRoute,
+  } as any)
 const AdminEventsEventIdDeurRoute = AdminEventsEventIdDeurRouteImport.update({
   id: '/events/$eventId_/deur',
   path: '/events/$eventId/deur',
@@ -186,6 +193,7 @@ export interface FileRoutesByFullPath {
   '/t/$code/qr': typeof TCodeQrRoute
   '/admin/events/': typeof AdminEventsIndexRoute
   '/platform/events/': typeof PlatformEventsIndexRoute
+  '/admin/events/$eventId/dashboard': typeof AdminEventsEventIdDashboardRoute
   '/admin/events/$eventId/deur': typeof AdminEventsEventIdDeurRoute
 }
 export interface FileRoutesByTo {
@@ -211,6 +219,7 @@ export interface FileRoutesByTo {
   '/t/$code/qr': typeof TCodeQrRoute
   '/admin/events': typeof AdminEventsIndexRoute
   '/platform/events': typeof PlatformEventsIndexRoute
+  '/admin/events/$eventId/dashboard': typeof AdminEventsEventIdDashboardRoute
   '/admin/events/$eventId/deur': typeof AdminEventsEventIdDeurRoute
 }
 export interface FileRoutesById {
@@ -239,6 +248,7 @@ export interface FileRoutesById {
   '/t/$code_/qr': typeof TCodeQrRoute
   '/admin/events/': typeof AdminEventsIndexRoute
   '/platform/events/': typeof PlatformEventsIndexRoute
+  '/admin/events/$eventId_/dashboard': typeof AdminEventsEventIdDashboardRoute
   '/admin/events/$eventId_/deur': typeof AdminEventsEventIdDeurRoute
 }
 export interface FileRouteTypes {
@@ -268,6 +278,7 @@ export interface FileRouteTypes {
     | '/t/$code/qr'
     | '/admin/events/'
     | '/platform/events/'
+    | '/admin/events/$eventId/dashboard'
     | '/admin/events/$eventId/deur'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -293,6 +304,7 @@ export interface FileRouteTypes {
     | '/t/$code/qr'
     | '/admin/events'
     | '/platform/events'
+    | '/admin/events/$eventId/dashboard'
     | '/admin/events/$eventId/deur'
   id:
     | '__root__'
@@ -320,6 +332,7 @@ export interface FileRouteTypes {
     | '/t/$code_/qr'
     | '/admin/events/'
     | '/platform/events/'
+    | '/admin/events/$eventId_/dashboard'
     | '/admin/events/$eventId_/deur'
   fileRoutesById: FileRoutesById
 }
@@ -513,6 +526,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TCodeQrRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/events/$eventId_/dashboard': {
+      id: '/admin/events/$eventId_/dashboard'
+      path: '/events/$eventId/dashboard'
+      fullPath: '/admin/events/$eventId/dashboard'
+      preLoaderRoute: typeof AdminEventsEventIdDashboardRouteImport
+      parentRoute: typeof AdminRouteRoute
+    }
     '/admin/events/$eventId_/deur': {
       id: '/admin/events/$eventId_/deur'
       path: '/events/$eventId/deur'
@@ -527,6 +547,7 @@ interface AdminRouteRouteChildren {
   AdminIndexRoute: typeof AdminIndexRoute
   AdminEventsEventIdRoute: typeof AdminEventsEventIdRoute
   AdminEventsIndexRoute: typeof AdminEventsIndexRoute
+  AdminEventsEventIdDashboardRoute: typeof AdminEventsEventIdDashboardRoute
   AdminEventsEventIdDeurRoute: typeof AdminEventsEventIdDeurRoute
 }
 
@@ -534,6 +555,7 @@ const AdminRouteRouteChildren: AdminRouteRouteChildren = {
   AdminIndexRoute: AdminIndexRoute,
   AdminEventsEventIdRoute: AdminEventsEventIdRoute,
   AdminEventsIndexRoute: AdminEventsIndexRoute,
+  AdminEventsEventIdDashboardRoute: AdminEventsEventIdDashboardRoute,
   AdminEventsEventIdDeurRoute: AdminEventsEventIdDeurRoute,
 }
 

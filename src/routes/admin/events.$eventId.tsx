@@ -39,7 +39,16 @@ type Categorie = (typeof eventCategories)[number]
 
 export const Route = createFileRoute('/admin/events/$eventId')({
   loader: async ({ params }) => {
-    const [event, types, tickets, baseUrl, sprekers, agenda, faq, reserveringen] = await Promise.all([
+    const [
+      event,
+      types,
+      tickets,
+      baseUrl,
+      sprekers,
+      agenda,
+      faq,
+      reserveringen,
+    ] = await Promise.all([
       getEvent({ data: params.eventId }),
       listTicketTypes({ data: params.eventId }),
       listTickets({ data: { eventId: params.eventId } }),
@@ -49,7 +58,16 @@ export const Route = createFileRoute('/admin/events/$eventId')({
       listFaq({ data: params.eventId }),
       listReserveringen({ data: params.eventId }),
     ])
-    return { event, types, tickets, baseUrl, sprekers, agenda, faq, reserveringen }
+    return {
+      event,
+      types,
+      tickets,
+      baseUrl,
+      sprekers,
+      agenda,
+      faq,
+      reserveringen,
+    }
   },
   component: EventDetail,
 })
@@ -70,9 +88,17 @@ const inputCls =
 const inputSm =
   'w-full rounded-[9px] border border-[#E5E7EB] bg-[#F8FAFC] px-3 py-2 text-[13.5px] outline-none focus:border-[#2563EB]'
 
-function Kaart({ children, className = '' }: { children: ReactNode; className?: string }) {
+function Kaart({
+  children,
+  className = '',
+}: {
+  children: ReactNode
+  className?: string
+}) {
   return (
-    <div className={`rounded-2xl border border-[#E5E7EB] bg-white p-5 shadow-sm sm:p-6 ${className}`}>
+    <div
+      className={`rounded-2xl border border-[#E5E7EB] bg-white p-5 shadow-sm sm:p-6 ${className}`}
+    >
       {children}
     </div>
   )
@@ -100,7 +126,8 @@ function PrimaryBtn({
   disabled?: boolean
   size?: 'sm' | 'md'
 }) {
-  const pad = size === 'sm' ? 'px-4 py-2 text-[13px]' : 'px-5 py-2.5 text-[14px]'
+  const pad =
+    size === 'sm' ? 'px-4 py-2 text-[13px]' : 'px-5 py-2.5 text-[14px]'
   return (
     <button
       type={type}
@@ -170,7 +197,9 @@ function EventSectie() {
   const [locatie, setLocatie] = useState(event.locatie ?? '')
   const [reEntry, setReEntry] = useState(event.re_entry_toegestaan)
   const [status, setStatus] = useState(event.status)
-  const [categorie, setCategorie] = useState<Categorie | ''>(event.categorie ?? '')
+  const [categorie, setCategorie] = useState<Categorie | ''>(
+    event.categorie ?? '',
+  )
   const [beschrijving, setBeschrijving] = useState(event.beschrijving ?? '')
   const [cover, setCover] = useState<Cover>({
     url: event.cover_afbeelding_url ?? '',
@@ -221,8 +250,12 @@ function EventSectie() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="flex items-center gap-3">
-            <h1 className="text-[24px] font-extrabold tracking-tight">{event.naam}</h1>
-            <span className={`rounded-full px-3 py-1 text-[12px] font-bold ${eventStatusStijl[event.status] ?? eventStatusStijl.concept}`}>
+            <h1 className="text-[24px] font-extrabold tracking-tight">
+              {event.naam}
+            </h1>
+            <span
+              className={`rounded-full px-3 py-1 text-[12px] font-bold ${eventStatusStijl[event.status] ?? eventStatusStijl.concept}`}
+            >
               {event.status}
             </span>
           </div>
@@ -232,6 +265,13 @@ function EventSectie() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <Link
+            to="/admin/events/$eventId/dashboard"
+            params={{ eventId: event.id }}
+            className="rounded-full border border-[#E5E7EB] bg-white px-4 py-2 text-[13px] font-semibold text-[#0F172A] hover:border-[#CBD5E1]"
+          >
+            Dashboard
+          </Link>
           <Link
             to="/admin/events/$eventId/deur"
             params={{ eventId: event.id }}
@@ -246,7 +286,9 @@ function EventSectie() {
           >
             Scannen
           </Link>
-          <GhostBtn onClick={() => setOpen((v) => !v)}>{open ? 'Annuleren' : 'Bewerken'}</GhostBtn>
+          <GhostBtn onClick={() => setOpen((v) => !v)}>
+            {open ? 'Annuleren' : 'Bewerken'}
+          </GhostBtn>
         </div>
       </div>
 
@@ -254,26 +296,56 @@ function EventSectie() {
         <Kaart className="mt-4">
           <form onSubmit={opslaan} className="grid gap-4">
             <Veld label="Naam">
-              <input required value={naam} onChange={(e) => setNaam(e.target.value)} className={inputCls} />
+              <input
+                required
+                value={naam}
+                onChange={(e) => setNaam(e.target.value)}
+                className={inputCls}
+              />
             </Veld>
             <div className="grid gap-4 sm:grid-cols-2">
               <Veld label="Start">
-                <input type="datetime-local" required value={start} onChange={(e) => setStart(e.target.value)} className={inputCls} />
+                <input
+                  type="datetime-local"
+                  required
+                  value={start}
+                  onChange={(e) => setStart(e.target.value)}
+                  className={inputCls}
+                />
               </Veld>
               <Veld label="Eind">
-                <input type="datetime-local" required value={eind} onChange={(e) => setEind(e.target.value)} className={inputCls} />
+                <input
+                  type="datetime-local"
+                  required
+                  value={eind}
+                  onChange={(e) => setEind(e.target.value)}
+                  className={inputCls}
+                />
               </Veld>
             </div>
             <Veld label="Locatie">
-              <input value={locatie} onChange={(e) => setLocatie(e.target.value)} className={inputCls} />
+              <input
+                value={locatie}
+                onChange={(e) => setLocatie(e.target.value)}
+                className={inputCls}
+              />
             </Veld>
             <div className="grid items-end gap-4 sm:grid-cols-2">
               <label className="flex items-center gap-2 text-[14px]">
-                <input type="checkbox" checked={reEntry} onChange={(e) => setReEntry(e.target.checked)} className="h-4 w-4 accent-[#2563EB]" />
+                <input
+                  type="checkbox"
+                  checked={reEntry}
+                  onChange={(e) => setReEntry(e.target.checked)}
+                  className="h-4 w-4 accent-[#2563EB]"
+                />
                 Re-entry toegestaan
               </label>
               <Veld label="Status">
-                <select value={status} onChange={(e) => setStatus(e.target.value)} className={inputCls}>
+                <select
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value)}
+                  className={inputCls}
+                >
                   <option value="concept">concept</option>
                   <option value="actief">actief</option>
                   <option value="afgelopen">afgelopen</option>
@@ -281,7 +353,11 @@ function EventSectie() {
               </Veld>
             </div>
             <Veld label="Categorie (publiek)">
-              <select value={categorie} onChange={(e) => setCategorie(e.target.value as Categorie | '')} className={inputCls}>
+              <select
+                value={categorie}
+                onChange={(e) => setCategorie(e.target.value as Categorie | '')}
+                className={inputCls}
+              >
                 <option value="">— geen —</option>
                 {eventCategories.map((c) => (
                   <option key={c} value={c}>
@@ -291,12 +367,19 @@ function EventSectie() {
               </select>
             </Veld>
             <Veld label="Beschrijving (publiek)">
-              <textarea value={beschrijving} onChange={(e) => setBeschrijving(e.target.value)} rows={4} className={inputCls} />
+              <textarea
+                value={beschrijving}
+                onChange={(e) => setBeschrijving(e.target.value)}
+                rows={4}
+                className={inputCls}
+              />
             </Veld>
             <Veld label="Cover-afbeelding (publiek)">
               <CoverUpload value={cover} onChange={setCover} />
             </Veld>
-            {fout && <p className="text-[14px] font-semibold text-[#DC2626]">{fout}</p>}
+            {fout && (
+              <p className="text-[14px] font-semibold text-[#DC2626]">{fout}</p>
+            )}
             <PrimaryBtn type="submit">Opslaan</PrimaryBtn>
           </form>
         </Kaart>
@@ -318,7 +401,11 @@ function ContentSectie({
   return (
     <Kaart>
       <h2 className="mb-4 text-[16px] font-extrabold">{titel}</h2>
-      {leeg && <p className="mb-3 text-[13.5px] text-[#64748B]">Nog niets toegevoegd.</p>}
+      {leeg && (
+        <p className="mb-3 text-[13.5px] text-[#64748B]">
+          Nog niets toegevoegd.
+        </p>
+      )}
       <div className="flex flex-col gap-2">{children}</div>
     </Kaart>
   )
@@ -326,13 +413,23 @@ function ContentSectie({
 
 function VerwijderKnop({ onClick }: { onClick: () => void }) {
   return (
-    <button onClick={onClick} className="text-[13px] font-semibold text-[#DC2626] hover:underline" type="button">
+    <button
+      onClick={onClick}
+      className="text-[13px] font-semibold text-[#DC2626] hover:underline"
+      type="button"
+    >
       Verwijderen
     </button>
   )
 }
 
-function RijItem({ children, actie }: { children: ReactNode; actie: ReactNode }) {
+function RijItem({
+  children,
+  actie,
+}: {
+  children: ReactNode
+  actie: ReactNode
+}) {
   return (
     <div className="flex items-center justify-between rounded-[12px] border border-[#E5E7EB] bg-[#F8FAFC] px-3.5 py-2.5">
       <span className="text-[13.5px]">{children}</span>
@@ -350,7 +447,9 @@ function SprekersSectie() {
 
   async function toevoegen(e: React.FormEvent) {
     e.preventDefault()
-    await createSpreker({ data: { event_id: event.id, naam, rol, avatar_url: avatarUrl } })
+    await createSpreker({
+      data: { event_id: event.id, naam, rol, avatar_url: avatarUrl },
+    })
     setNaam('')
     setRol('')
     setAvatarUrl('')
@@ -358,7 +457,10 @@ function SprekersSectie() {
   }
 
   return (
-    <ContentSectie titel="Sprekers / Line-up (publiek)" leeg={sprekers.length === 0}>
+    <ContentSectie
+      titel="Sprekers / Line-up (publiek)"
+      leeg={sprekers.length === 0}
+    >
       {sprekers.map((s) => (
         <RijItem
           key={s.id}
@@ -376,9 +478,25 @@ function SprekersSectie() {
         </RijItem>
       ))}
       <form onSubmit={toevoegen} className="mt-2 flex flex-wrap gap-2">
-        <input required value={naam} onChange={(e) => setNaam(e.target.value)} placeholder="Naam" className={`flex-1 ${inputSm}`} />
-        <input value={rol} onChange={(e) => setRol(e.target.value)} placeholder="Rol (bv. DJ)" className={`flex-1 ${inputSm}`} />
-        <input value={avatarUrl} onChange={(e) => setAvatarUrl(e.target.value)} placeholder="Avatar-URL" className={`flex-1 ${inputSm}`} />
+        <input
+          required
+          value={naam}
+          onChange={(e) => setNaam(e.target.value)}
+          placeholder="Naam"
+          className={`flex-1 ${inputSm}`}
+        />
+        <input
+          value={rol}
+          onChange={(e) => setRol(e.target.value)}
+          placeholder="Rol (bv. DJ)"
+          className={`flex-1 ${inputSm}`}
+        />
+        <input
+          value={avatarUrl}
+          onChange={(e) => setAvatarUrl(e.target.value)}
+          placeholder="Avatar-URL"
+          className={`flex-1 ${inputSm}`}
+        />
         <PrimaryBtn type="submit" size="sm">
           Toevoegen
         </PrimaryBtn>
@@ -397,7 +515,9 @@ function AgendaSectie() {
 
   async function toevoegen(e: React.FormEvent) {
     e.preventDefault()
-    await createAgenda({ data: { event_id: event.id, tijd, titel, subtitel, beschrijving } })
+    await createAgenda({
+      data: { event_id: event.id, tijd, titel, subtitel, beschrijving },
+    })
     setTijd('')
     setTitel('')
     setSubtitel('')
@@ -424,10 +544,32 @@ function AgendaSectie() {
         </RijItem>
       ))}
       <form onSubmit={toevoegen} className="mt-2 flex flex-wrap gap-2">
-        <input required value={tijd} onChange={(e) => setTijd(e.target.value)} placeholder="Tijd (bv. 09.00)" className={`w-28 ${inputSm}`} />
-        <input required value={titel} onChange={(e) => setTitel(e.target.value)} placeholder="Titel" className={`flex-1 ${inputSm}`} />
-        <input value={subtitel} onChange={(e) => setSubtitel(e.target.value)} placeholder="Subtitel" className={`flex-1 ${inputSm}`} />
-        <input value={beschrijving} onChange={(e) => setBeschrijving(e.target.value)} placeholder="Beschrijving" className={`w-full ${inputSm}`} />
+        <input
+          required
+          value={tijd}
+          onChange={(e) => setTijd(e.target.value)}
+          placeholder="Tijd (bv. 09.00)"
+          className={`w-28 ${inputSm}`}
+        />
+        <input
+          required
+          value={titel}
+          onChange={(e) => setTitel(e.target.value)}
+          placeholder="Titel"
+          className={`flex-1 ${inputSm}`}
+        />
+        <input
+          value={subtitel}
+          onChange={(e) => setSubtitel(e.target.value)}
+          placeholder="Subtitel"
+          className={`flex-1 ${inputSm}`}
+        />
+        <input
+          value={beschrijving}
+          onChange={(e) => setBeschrijving(e.target.value)}
+          placeholder="Beschrijving"
+          className={`w-full ${inputSm}`}
+        />
         <PrimaryBtn type="submit" size="sm">
           Toevoegen
         </PrimaryBtn>
@@ -451,7 +593,10 @@ function FaqSectie() {
   }
 
   return (
-    <ContentSectie titel="Veelgestelde vragen (publiek)" leeg={faq.length === 0}>
+    <ContentSectie
+      titel="Veelgestelde vragen (publiek)"
+      leeg={faq.length === 0}
+    >
       {faq.map((f) => (
         <RijItem
           key={f.id}
@@ -469,8 +614,19 @@ function FaqSectie() {
         </RijItem>
       ))}
       <form onSubmit={toevoegen} className="mt-2 flex flex-wrap gap-2">
-        <input required value={vraag} onChange={(e) => setVraag(e.target.value)} placeholder="Vraag" className={`flex-1 ${inputSm}`} />
-        <input value={antwoord} onChange={(e) => setAntwoord(e.target.value)} placeholder="Antwoord" className={`flex-1 ${inputSm}`} />
+        <input
+          required
+          value={vraag}
+          onChange={(e) => setVraag(e.target.value)}
+          placeholder="Vraag"
+          className={`flex-1 ${inputSm}`}
+        />
+        <input
+          value={antwoord}
+          onChange={(e) => setAntwoord(e.target.value)}
+          placeholder="Antwoord"
+          className={`flex-1 ${inputSm}`}
+        />
         <PrimaryBtn type="submit" size="sm">
           Toevoegen
         </PrimaryBtn>
@@ -506,10 +662,14 @@ function ReserveringenSectie() {
       <h2 className="mb-4 flex items-center text-[16px] font-extrabold">
         Reserveringen
         {open.length > 0 && (
-          <span className="ml-2 rounded-full bg-[#2563EB] px-2.5 py-0.5 text-[11px] font-bold text-white">{open.length} nieuw</span>
+          <span className="ml-2 rounded-full bg-[#2563EB] px-2.5 py-0.5 text-[11px] font-bold text-white">
+            {open.length} nieuw
+          </span>
         )}
       </h2>
-      {fout && <p className="mb-2 text-[14px] font-semibold text-[#DC2626]">{fout}</p>}
+      {fout && (
+        <p className="mb-2 text-[14px] font-semibold text-[#DC2626]">{fout}</p>
+      )}
       {reserveringen.length === 0 ? (
         <p className="text-[13.5px] text-[#64748B]">Nog geen reserveringen.</p>
       ) : (
@@ -524,15 +684,27 @@ function ReserveringenSectie() {
                   {r.naam} · {r.aantal}× {r.type_naam}
                 </div>
                 <div className="text-[#64748B]">
-                  {[r.email, r.telefoon].filter(Boolean).join(' · ') || 'geen contactgegevens'}
+                  {[r.email, r.telefoon].filter(Boolean).join(' · ') ||
+                    'geen contactgegevens'}
                   {r.opmerking ? ` — "${r.opmerking}"` : ''}
                 </div>
               </div>
               <div className="flex gap-2">
-                <PrimaryBtn size="sm" disabled={bezigId === r.id} onClick={() => actie(r.id, () => verwerkReservering({ data: r.id }))}>
+                <PrimaryBtn
+                  size="sm"
+                  disabled={bezigId === r.id}
+                  onClick={() =>
+                    actie(r.id, () => verwerkReservering({ data: r.id }))
+                  }
+                >
                   {bezigId === r.id ? 'Bezig…' : 'Ticket uitgeven'}
                 </PrimaryBtn>
-                <GhostBtn disabled={bezigId === r.id} onClick={() => actie(r.id, () => afwijzenReservering({ data: r.id }))}>
+                <GhostBtn
+                  disabled={bezigId === r.id}
+                  onClick={() =>
+                    actie(r.id, () => afwijzenReservering({ data: r.id }))
+                  }
+                >
                   Afwijzen
                 </GhostBtn>
               </div>
@@ -540,14 +712,27 @@ function ReserveringenSectie() {
           ))}
           {afgehandeld.length > 0 && (
             <details className="mt-1 text-[13.5px]">
-              <summary className="cursor-pointer font-semibold text-[#64748B]">Afgehandeld ({afgehandeld.length})</summary>
+              <summary className="cursor-pointer font-semibold text-[#64748B]">
+                Afgehandeld ({afgehandeld.length})
+              </summary>
               <div className="mt-2 flex flex-col gap-1">
                 {afgehandeld.map((r) => (
-                  <div key={r.id} className="flex justify-between rounded-[10px] border border-[#E5E7EB] px-3.5 py-2 text-[#64748B]">
+                  <div
+                    key={r.id}
+                    className="flex justify-between rounded-[10px] border border-[#E5E7EB] px-3.5 py-2 text-[#64748B]"
+                  >
                     <span>
                       {r.naam} · {r.aantal}× {r.type_naam}
                     </span>
-                    <span className={r.status === 'afgehandeld' ? 'font-semibold text-[#16A34A]' : 'text-[#94A3B8]'}>{r.status}</span>
+                    <span
+                      className={
+                        r.status === 'afgehandeld'
+                          ? 'font-semibold text-[#16A34A]'
+                          : 'text-[#94A3B8]'
+                      }
+                    >
+                      {r.status}
+                    </span>
                   </div>
                 ))}
               </div>
@@ -583,10 +768,18 @@ function TicketTypesSectie() {
         <table className="w-full min-w-[560px] border-collapse text-[13.5px]">
           <thead>
             <tr className="text-left text-[#64748B]">
-              <th className="rounded-l-[9px] bg-[#F8FAFC] px-4 py-2.5 font-bold">Naam</th>
-              <th className="bg-[#F8FAFC] px-4 py-2.5 font-bold">Prijs (SRD)</th>
-              <th className="bg-[#F8FAFC] px-4 py-2.5 font-bold">Inkoop (SRD)</th>
-              <th className="bg-[#F8FAFC] px-4 py-2.5 font-bold">Verkocht / beschikbaar</th>
+              <th className="rounded-l-[9px] bg-[#F8FAFC] px-4 py-2.5 font-bold">
+                Naam
+              </th>
+              <th className="bg-[#F8FAFC] px-4 py-2.5 font-bold">
+                Prijs (SRD)
+              </th>
+              <th className="bg-[#F8FAFC] px-4 py-2.5 font-bold">
+                Inkoop (SRD)
+              </th>
+              <th className="bg-[#F8FAFC] px-4 py-2.5 font-bold">
+                Verkocht / beschikbaar
+              </th>
               <th className="rounded-r-[9px] bg-[#F8FAFC] px-4 py-2.5"></th>
             </tr>
           </thead>
@@ -609,7 +802,9 @@ function TicketTypesSectie() {
                 <tr key={t.id} className="border-t border-[#E5E7EB]">
                   <td className="px-4 py-3 font-semibold">{t.naam}</td>
                   <td className="px-4 py-3 tabular-nums">{t.prijs_srd}</td>
-                  <td className="px-4 py-3 tabular-nums">{t.inkoopprijs_srd}</td>
+                  <td className="px-4 py-3 tabular-nums">
+                    {t.inkoopprijs_srd}
+                  </td>
                   <td className="px-4 py-3 tabular-nums">
                     {t.aantal_verkocht} / {t.aantal_beschikbaar}
                   </td>
@@ -706,16 +901,36 @@ function TypeForm({
     <form onSubmit={opslaan} className="flex flex-col gap-3">
       <div className="grid grid-cols-2 items-end gap-3 sm:grid-cols-4">
         <Veld label="Naam">
-          <input required value={naam} onChange={(e) => setNaam(e.target.value)} className={inputSm} />
+          <input
+            required
+            value={naam}
+            onChange={(e) => setNaam(e.target.value)}
+            className={inputSm}
+          />
         </Veld>
         <Veld label="Prijs (SRD)">
-          <input required value={prijs} onChange={(e) => setPrijs(e.target.value)} className={inputSm} />
+          <input
+            required
+            value={prijs}
+            onChange={(e) => setPrijs(e.target.value)}
+            className={inputSm}
+          />
         </Veld>
         <Veld label="Inkoop (SRD)">
-          <input required value={inkoop} onChange={(e) => setInkoop(e.target.value)} className={inputSm} />
+          <input
+            required
+            value={inkoop}
+            onChange={(e) => setInkoop(e.target.value)}
+            className={inputSm}
+          />
         </Veld>
         <Veld label="Beschikbaar">
-          <input required value={aantal} onChange={(e) => setAantal(e.target.value)} className={inputSm} />
+          <input
+            required
+            value={aantal}
+            onChange={(e) => setAantal(e.target.value)}
+            className={inputSm}
+          />
         </Veld>
       </div>
       <Veld label="Kenmerken (één per regel)">
@@ -727,7 +942,9 @@ function TypeForm({
           className={inputSm}
         />
       </Veld>
-      {fout && <p className="text-[14px] font-semibold text-[#DC2626]">{fout}</p>}
+      {fout && (
+        <p className="text-[14px] font-semibold text-[#DC2626]">{fout}</p>
+      )}
       <PrimaryBtn type="submit" size="sm">
         Opslaan
       </PrimaryBtn>
@@ -794,7 +1011,12 @@ function LeverKnoppen({ ticket }: { ticket: LeverbaarTicket }) {
 
   return (
     <span className="inline-flex items-center gap-3 whitespace-nowrap text-[13px] font-semibold">
-      <a href={url} target="_blank" rel="noreferrer" className="text-[#2563EB] hover:underline">
+      <a
+        href={url}
+        target="_blank"
+        rel="noreferrer"
+        className="text-[#2563EB] hover:underline"
+      >
         ticket
       </a>
       <button
@@ -813,7 +1035,9 @@ function LeverKnoppen({ ticket }: { ticket: LeverbaarTicket }) {
       >
         {bezig ? 'bezig…' : 'mail'}
       </button>
-      {fout && <span className="text-[12px] font-normal text-[#DC2626]">{fout}</span>}
+      {fout && (
+        <span className="text-[12px] font-normal text-[#DC2626]">{fout}</span>
+      )}
     </span>
   )
 }
@@ -874,15 +1098,26 @@ function UitgifteSectie({
     <Kaart>
       <h2 className="mb-4 text-[16px] font-extrabold">Ticket uitgeven</h2>
       {types.length === 0 ? (
-        <p className="text-[13.5px] text-[#64748B]">Maak eerst een tickettype aan.</p>
+        <p className="text-[13.5px] text-[#64748B]">
+          Maak eerst een tickettype aan.
+        </p>
       ) : (
         <form onSubmit={verkopen} className="grid gap-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <Veld label="Kopersnaam">
-              <input required value={naam} onChange={(e) => setNaam(e.target.value)} className={inputCls} />
+              <input
+                required
+                value={naam}
+                onChange={(e) => setNaam(e.target.value)}
+                className={inputCls}
+              />
             </Veld>
             <Veld label="Tickettype">
-              <select value={typeId} onChange={(e) => setTypeId(e.target.value)} className={inputCls}>
+              <select
+                value={typeId}
+                onChange={(e) => setTypeId(e.target.value)}
+                className={inputCls}
+              >
                 {types.map((t) => (
                   <option key={t.id} value={t.id}>
                     {t.naam}
@@ -891,21 +1126,39 @@ function UitgifteSectie({
               </select>
             </Veld>
             <Veld label="Telefoon">
-              <input value={telefoon} onChange={(e) => setTelefoon(e.target.value)} className={inputCls} />
+              <input
+                value={telefoon}
+                onChange={(e) => setTelefoon(e.target.value)}
+                className={inputCls}
+              />
             </Veld>
             <Veld label="E-mail">
-              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className={inputCls} />
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className={inputCls}
+              />
             </Veld>
             <Veld label="Verkoopkanaal">
-              <input value={kanaal} onChange={(e) => setKanaal(e.target.value)} placeholder="whatsapp, contant, …" className={inputCls} />
+              <input
+                value={kanaal}
+                onChange={(e) => setKanaal(e.target.value)}
+                placeholder="whatsapp, contant, …"
+                className={inputCls}
+              />
             </Veld>
           </div>
-          {fout && <p className="text-[14px] font-semibold text-[#DC2626]">{fout}</p>}
+          {fout && (
+            <p className="text-[14px] font-semibold text-[#DC2626]">{fout}</p>
+          )}
           {laatste && (
             <div className="flex flex-wrap items-center gap-3 rounded-[12px] bg-[#DCFCE7] px-3.5 py-2.5 text-[13.5px] text-[#166534]">
               <span>
                 Ticket uitgegeven voor {laatste.koper_naam} (code{' '}
-                <span className="font-mono font-semibold tracking-wider">{kortCode(laatste.code)}</span>
+                <span className="font-mono font-semibold tracking-wider">
+                  {kortCode(laatste.code)}
+                </span>
                 ). Versturen:
               </span>
               <LeverKnoppen ticket={laatste} />
@@ -954,7 +1207,9 @@ function VerkooplijstSectie() {
   return (
     <Kaart>
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h2 className="text-[16px] font-extrabold">Verkooplijst ({lijst.length})</h2>
+        <h2 className="text-[16px] font-extrabold">
+          Verkooplijst ({lijst.length})
+        </h2>
         <input
           value={zoek}
           onChange={(e) => setZoek(e.target.value)}
@@ -967,7 +1222,9 @@ function VerkooplijstSectie() {
         <table className="w-full min-w-[760px] border-collapse text-[13.5px]">
           <thead>
             <tr className="text-left text-[#64748B]">
-              <th className="rounded-l-[9px] bg-[#F8FAFC] px-4 py-2.5 font-bold">Naam</th>
+              <th className="rounded-l-[9px] bg-[#F8FAFC] px-4 py-2.5 font-bold">
+                Naam
+              </th>
               <th className="bg-[#F8FAFC] px-4 py-2.5 font-bold">Type</th>
               <th className="bg-[#F8FAFC] px-4 py-2.5 font-bold">Code</th>
               <th className="bg-[#F8FAFC] px-4 py-2.5 font-bold">Contact</th>
@@ -979,16 +1236,26 @@ function VerkooplijstSectie() {
           </thead>
           <tbody>
             {lijst.map((t) => {
-              const st = t.ingetrokken_op ? 'ingetrokken' : t.gebruikt_op ? 'gebruikt' : 'geldig'
+              const st = t.ingetrokken_op
+                ? 'ingetrokken'
+                : t.gebruikt_op
+                  ? 'gebruikt'
+                  : 'geldig'
               const badge = ticketStatus[st]
               return (
                 <tr key={t.id} className="border-t border-[#E5E7EB]">
                   <td className="px-4 py-3 font-semibold">{t.koper_naam}</td>
                   <td className="px-4 py-3">{t.type_naam}</td>
-                  <td className="px-4 py-3 font-mono tracking-wider text-[#334155]">{kortCode(t.code)}</td>
-                  <td className="px-4 py-3 text-[#64748B]">{t.koper_telefoon || t.koper_email || '—'}</td>
+                  <td className="px-4 py-3 font-mono tracking-wider text-[#334155]">
+                    {kortCode(t.code)}
+                  </td>
+                  <td className="px-4 py-3 text-[#64748B]">
+                    {t.koper_telefoon || t.koper_email || '—'}
+                  </td>
                   <td className="px-4 py-3">
-                    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-bold ${badge.cls}`}>
+                    <span
+                      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-bold ${badge.cls}`}
+                    >
                       <span className="h-1.5 w-1.5 rounded-full bg-current" />
                       {badge.tekst}
                     </span>
@@ -1022,7 +1289,10 @@ function VerkooplijstSectie() {
                   </td>
                   <td className="px-4 py-3 text-right">
                     {!t.ingetrokken_op && (
-                      <button onClick={() => intrekken(t.id)} className="text-[13px] font-semibold text-[#DC2626] hover:underline">
+                      <button
+                        onClick={() => intrekken(t.id)}
+                        className="text-[13px] font-semibold text-[#DC2626] hover:underline"
+                      >
                         intrekken
                       </button>
                     )}
