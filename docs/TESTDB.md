@@ -14,9 +14,15 @@ dev-data te vervuilen. Zelfde Postgres-server, andere database.
   `.env.test`, zodat de testomgeving náást de dev-server op 3000 — en op de VPS
   ook náást productie op 3100 — kan draaien). Dit bestand is gitignored;
   `.env.test.example` is het gedeelde sjabloon.
-- **`drizzle.config.ts`** laadt standaard `.env`, maar kijkt naar de omgevings-
-  variabele `ENV_FILE`. `db:migrate:test` zet `ENV_FILE=.env.test`, waardoor de
-  migraties tegen de test-DB draaien.
+- **`drizzle.config.ts`** laadt `.env`, **`drizzle.config.test.ts`** laadt
+  `.env.test`; beide bouwen op `drizzle.shared.ts`. `db:migrate:test` kiest de
+  test-config met `drizzle-kit migrate --config=drizzle.config.test.ts`,
+  waardoor de migraties tegen de test-DB draaien.
+
+  Bewust twee configbestanden in plaats van `ENV_FILE=.env.test` vooraf: npm
+  draait scripts op Windows via cmd.exe — ook vanuit Git Bash — en cmd kent die
+  prefix niet. Met `--config` werkt hetzelfde script op Windows en op de VPS.
+  Handmatig aanroepen met `ENV_FILE` blijft wel werken.
 - De seed- en dev-scripts met `:test` gebruiken `--env-file=.env.test`.
 
 ## Eenmalige setup

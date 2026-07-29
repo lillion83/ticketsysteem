@@ -20,7 +20,7 @@
     "db:seed-admin": "tsx --env-file=.env src/db/seed-admin.ts",
     "db:reset-admin-password": "tsx --env-file=.env src/db/reset-admin-password.ts",
     "dev:test": "node --env-file=.env.test node_modules/vite/bin/vite.js dev",
-    "db:migrate:test": "ENV_FILE=.env.test drizzle-kit migrate",
+    "db:migrate:test": "drizzle-kit migrate --config=drizzle.config.test.ts",
     "db:seed:test": "tsx --env-file=.env.test src/db/seed.ts",
     "db:seed-admin:test": "tsx --env-file=.env.test src/db/seed-admin.ts"
   },

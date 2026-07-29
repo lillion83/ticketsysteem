@@ -262,9 +262,24 @@ Er draait nog een oude dev-server. Sluit het andere Git Bash-venster, of gebruik
 Line endings. Zet het om met:
 `git config --global core.autocrlf input` en clone daarna opnieuw.
 
-**Een commando werkt niet, met een rare foutmelding over `ENV_FILE`**
-Je zit in PowerShell of CMD in plaats van Git Bash. De `:test`-scripts gebruiken
-Unix-syntaxis. Open Git Bash.
+**`'X' is not recognized as an internal or external command`**
+Een npm-script probeert een omgevingsvariabele vooraf te zetten
+(`X=... commando`). Dat werkt niet op Windows: npm draait scripts via `cmd.exe`,
+óók als jij in Git Bash zit. Draai het commando dan rechtstreeks in Git Bash
+(zonder `npm run`, met `npx` ervoor), en meld het — het script hoort
+platform-onafhankelijk gemaakt te worden.
+
+**`psql -c "..."` voert de query niet uit**
+Op deze installatie wordt het argument genegeerd ("extra command-line argument
+ignored") en opent psql gewoon een sessie. Gebruik in plaats daarvan:
+`echo "\dt" | psql "<url>"`.
+
+**`WARNING: Console code page (437) differs from Windows code page (1252)`**
+Onschuldig. Gaat alleen over hoe accenttekens in psql-uitvoer worden getoond.
+
+**`Found ~/.bashrc but no ~/.bash_profile`**
+Onschuldig. Git Bash maakt de ontbrekende `~/.bash_profile` zelf aan en laadt
+daarmee je `~/.bashrc` alsnog in. Sluit het venster en open het opnieuw.
 
 ---
 
