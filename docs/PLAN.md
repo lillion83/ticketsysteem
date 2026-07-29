@@ -1,6 +1,13 @@
 # Projectplan — E-ticketsysteem met QR en deurscanner
 
-**Versie 1.1 — fase 1: één evenement, binnenlocatie, max. 200 tickets, offline-first scanner**
+**Versie 1.2 — fase 1 (A–F) afgerond; tweede reeks G–K afgerond**
+
+Secties 1 t/m 9 beschrijven fase 1 zoals oorspronkelijk gepland en gebouwd: één
+evenement, handmatige verkoop, offline-first scanner. Die fundering staat en is
+niet veranderd. **Sectie 10 beschrijft de tweede reeks fases (G t/m K)**, die
+daar bovenop is gebouwd: de publieke discovery-kant, koper- en
+organisator-accounts en rollen. Lees bij twijfel over de huidige stand sectie 10
+— niet sectie 1, die is een momentopname van het begin.
 
 ---
 
@@ -22,6 +29,12 @@
 **Wat expliciet buiten scope is in fase 1:** online betaling, publieke verkooppagina, self-service onboarding van organisatoren, ledger/uitbetalingen, refundflow, native app.
 
 Deze zijn bewust uitgesteld, niet vergeten. Het datamodel blokkeert ze niet.
+
+> **Inmiddels achterhaald:** de publieke verkooppagina (als *reserveringspagina*,
+> zonder betaling) en de self-service onboarding van organisatoren zijn in de
+> tweede reeks wél gebouwd — zie sectie 10, fases G en H. Online betaling,
+> ledger, uitbetalingen, refunds en een native app blijven buiten scope (harde
+> regel 6).
 
 ---
 
@@ -104,7 +117,7 @@ https://[domein]/t/{ticket_id}.{signature}
 
 Die pagina toont de QR groot, met naam, event, datum en tickettype eronder. Werkt identiek voor WhatsApp en mail, de koper kan hem altijd heropenen, en bij een correctie hoef je niets opnieuw te versturen.
 
-De mail via Brevo bevat dezelfde link plus de QR als afbeelding, zodat mensen die hun mail offline lezen ook binnenkomen.
+De mail bevat dezelfde link plus de QR als afbeelding, zodat mensen die hun mail offline lezen ook binnenkomen. (De mail liep eerst via Brevo, sinds `8eabc7c` via Resend — zie sectie 2.)
 
 De pagina is beveiligd door de HMAC in de URL — niet te raden, geen login nodig.
 
@@ -238,3 +251,162 @@ Zonder herbouw, alleen uitbreiding:
 - **Genummerde plaatsen** → extra tabel, `tickets` krijgt een verwijzing.
 
 Wat een herbouw zou vereisen en dus nú goed moet: het codeformaat (HMAC), de atomaire scan, `organization_id` overal, en `verkocht_door` als user-referentie.
+
+---
+
+## 10. Tweede reeks: fases G t/m K (publieke kant, accounts en rollen)
+
+Na fase F is een tweede reeks fases gebouwd die in losse sessies is bedacht en
+niet in de oorspronkelijke planning stond. Dit is de inhaalslag: wat er is, en
+waarom.
+
+**De rode draad:** fase 1 had één verkoper (Amresh) en één organisator. Deze
+reeks maakt er een platform van waar bezoekers events vinden en reserveren,
+kopers hun tickets in een account terugvinden, en organisatoren zichzelf
+aanmelden — zonder dat er ook maar één betaling in het systeem komt. Harde regel
+6 staat overeind: reserveren is een *aanvraag*, de uitgifte blijft handmatig.
+
+**Twee dingen om te weten voordat je hierin duikt:**
+
+- **De letters zeggen niets over de bouwvolgorde.** Er is gebouwd in de volgorde
+  G → I → K → H → J. Waar een fase op een latere leunt, staat dat hieronder.
+- **De discovery-front-end kwam vóór fase G.** De publieke homepage,
+  events-overzicht, event-detailpagina en de 3-staps organiseer-flow zijn
+  gebouwd in `d4402ab` t/m `405c737`, als losse voorbereiding zonder faseletter.
+  Fase G en I bouwen daarop verder. Zonder die commits hangen G en I in de lucht.
+
+### Fase G — Reserveringsbrug (`4ad483e`)
+
+Publiek reserveren aan de voorkant, handmatige uitgifte aan de achterkant. Een
+bezoeker vraagt op de event-detailpagina een ticket aan (tickettype, aantal,
+contactgegevens); de organisator ziet de aanvraag in de admin en verwerkt hem
+met de bestaande uitgifte-flow uit fase B tot een echt ticket, of wijst hem af.
+
+- **Schema (migratie 0005):** tabel `reserveringen` + enum
+  `reservering_status` (`nieuw` / `afgehandeld` / `afgewezen`), org-gescoopt.
+- **Server:** `src/server/reserveringen.ts`. `createReservering` is publiek
+  (geen sessie — dezelfde bewuste uitzondering als `publicTicket.ts`);
+  `listReserveringen`, `verwerkReservering` en `afwijzenReservering` zijn
+  auth-gescoopt. Verwerken boekt de voorraad atomair op en geeft de tickets uit.
+
+*Checkpoint:* uitgelogd een reservering plaatsen op `/events/{id}` → verschijnt
+in de admin onder Reserveringen → "Ticket uitgeven" levert een echt ticket met
+werkende QR, en de voorraad van het tickettype klopt.
+
+### Fase I — Discovery-stubs echt maken (`b11041e`)
+
+De discovery-front-end had werkende schermen met dode knoppen. Deze fase maakt
+ze echt: de zoekbalk op de homepage navigeert naar `/events` met searchparams;
+de filters op `/events` werken (datum, prijs-slider, gratis/betaald, sorteren,
+paginering van 9 per pagina) en staan allemaal in de URL, dus een gefilterde
+lijst is deelbaar. Op de detailpagina: "Bekijk op Kaart" → Google Maps, "Deel" →
+Web Share API met clipboard-fallback, "Bewaar" → favoriet in `localStorage`.
+"Volgen" is verborgen in plaats van nep.
+
+Ook nieuw: `/mijn-ticket` als opzoeker — code of ticketlink invoeren →
+doorsturen naar `/t/{code}`. Fase K bouwt die route later om tot een echt
+kopersdashboard; de opzoeker blijft ernaast bestaan voor wie geen account heeft.
+
+*Checkpoint:* filter op `/events` combineren, pagina verversen → dezelfde
+resultaten (alles zit in de URL). Een ticketcode in `/mijn-ticket` invoeren
+opent de ticketpagina.
+
+### Fase K — Koper-accounts en Mijn Tickets (`761ad87`)
+
+Kopers krijgen een account en zien hun tickets met status terug. Twee
+inlogwegen: Google (optioneel, alleen als de env-variabelen gezet zijn) en een
+code per e-mail (`emailOTP`). Account-linking op geverifieerd e-mailadres, zodat
+beide wegen op dezelfde gebruiker uitkomen.
+
+- **Schema (migratie 0006):** `tickets.koper_user_id` (FK → `user`). Gevuld bij
+  uitgifte als het e-mailadres al een account heeft, anders bij de eerste login
+  met dat adres — `listMijnTickets` claimt de tickets dan alsnog op het
+  geverifieerde e-mailadres.
+- **Sessie:** nieuwe `requireUser` — een sessie *zonder* org-eis. Nodig omdat
+  kopers geen `organization_id` hebben. Admin en `/events/new` weren
+  koper-sessies expliciet.
+
+*Checkpoint:* inloggen met de e-mailcode op `/mijn-ticket` → de tickets die op
+dat adres zijn uitgegeven staan er, met de juiste statusbadge (geldig / gebruikt
+/ ingetrokken).
+
+### Fase H — Organisator-onboarding (`5fc5010`)
+
+Sluit de keten: een ingelogde koper zonder organisatie kan zich op
+`/word-organisator` als organisator registreren, krijgt een eigen
+`organization_id`, en daarmee toegang tot de admin en de organiseer-flow. Geen
+schemawijziging nodig — `organizations` en `user.organization_id` bestonden al
+uit fase A.
+
+Eén tenant per gebruiker: `wordOrganisator()` weigert als je al organisator
+bent. De onboarding neemt een `redirect`-parameter, zodat iemand die halverwege
+de organiseer-flow strandde daarna terugkomt waar hij was.
+
+*Checkpoint:* als koper `/events/new` openen → je komt op `/word-organisator`,
+niet op de homepage. Organisatie aanmaken → je landt terug in de organiseer-flow
+en kunt publiceren.
+
+### Fase J — Rolgebaseerd systeem (`182bfb0`)
+
+Drie echte rollen op user-niveau, elk met het juiste dashboard. Dit is de fase
+die de andere vier aan elkaar knoopt.
+
+- **Schema (migratie 0007):** enum `gebruiker_rol` + kolom `user.rol`, default
+  `koper`.
+- **Landing na inloggen:** `homePathForRole` in `src/lib/rol.ts` is de enige bron
+  van waarheid — koper → `/mijn-ticket`, organisator → `/admin`, admin →
+  `/platform`.
+- **Platform-gebied** (`/platform`, alleen admin): dashboard met
+  platform-brede KPI's en een events-lijst over alle organisatoren.
+- Chart- en KPI-componenten uitgelicht naar `src/components/admin/charts.tsx`,
+  gedeeld door het admin- en het platform-dashboard. Handgetekende SVG, geen
+  chart-library.
+
+**De uitzondering op harde regel 3, expliciet vastgelegd.** Regel 3 zegt: elke
+query filtert op `organization_id`, geen uitzonderingen. Het platform-overzicht
+kan dat per definitie niet. Daarom is er precies één cross-org leesweg:
+`requireAdmin()` in `src/server/session.ts`. In `63abf3b` is die uitzondering
+uitgebreid naar *schrijven* op event-inhoud (`requireContentAccess` in
+`src/server/scope.ts`), zodat de admin de inhoud van elk event kan corrigeren:
+eventgegevens, tickettypes, sprekers, agenda, FAQ. **Niet** tickets uitgeven,
+scannen of reserveringen verwerken namens een organisator — dat blijft van de
+organisator zelf. Wie hier iets aan verandert: dit is een afgesproken
+uitzondering, geen vrijbrief. Nieuwe cross-org queries erbuiten zijn een bug.
+
+*Checkpoint:* met elk van de drie rollen inloggen → je landt op het juiste
+dashboard. Als koper `/admin` proberen → je wordt naar je eigen dashboard
+gestuurd. `/profiel` toont je rol.
+
+### Na fase K — losse verbeteringen
+
+Geen faseletters, wel wezenlijke wijzigingen:
+
+- **Admin in de huisstijl** (`36f9749`, `d398b22`, `bd3f077`): de admin-shell,
+  het dashboard, de event-detailpagina en Deur & rapportage zijn herstijld en
+  lopen op echte data in plaats van placeholders.
+- **Event-dashboard per event** (`19da2da`): één scherm per event met tabbladen
+  **vóór / tijdens / na**, dat automatisch op de huidige fase opent op basis van
+  de datums. Eigen KPI's per fase, plus een Event Health Score en een
+  Inzichten-blok. Route:
+  `src/routes/admin/events.$eventId_.dashboard.tsx`.
+- **Cover-afbeeldingen** (`8e6a4fb` t/m `a6a54d2`): uploaden in plaats van een
+  URL invullen, met een door de organisator gekozen focuspunt, een banner die
+  zich aan het formaat van de flyer aanpast, en een lightbox voor de volledige
+  flyer. Bestanden staan in `uploads/`, buiten de build-output, zodat een deploy
+  ze niet raakt.
+- **Mijn Tickets herzien** (`b725148`): tickets gegroepeerd per event, met een
+  detailpagina per event.
+- **Test-omgeving** (`0a693e3`): aparte test-database `ticketsysteem_test` op
+  poort 3200, met eigen env en migratie-/seedscripts. Zie `docs/TESTDB.md` en de
+  droogtest-checklist in `docs/TESTPLAN-CHECKLIST.md`.
+
+### Wat deze reeks openlaat
+
+- **Betalen blijft handmatig.** Reserveren is een aanvraag; iemand moet hem
+  verwerken. Dat is een bewuste keuze, geen ontbrekende feature.
+- **De organization-plugin van Better Auth is nog niet in gebruik.** De tenant
+  zit als `additionalField` op de user (`user.organization_id`). Eén organisatie
+  per gebruiker, geen teams, geen leden. Voldoende voor nu; de plugin staat klaar
+  voor het moment dat een organisatie meerdere medewerkers krijgt.
+- **Rollen zijn platform-breed, niet per organisatie.** Je bent koper,
+  organisator óf admin — niet "organisator bij deze org en koper bij die".
