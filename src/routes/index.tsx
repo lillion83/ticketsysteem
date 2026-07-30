@@ -15,6 +15,7 @@ import {
 import { categories } from '#/components/discovery/data'
 import { formatPrice, useCurrency } from '#/components/discovery/currency'
 import { listPublicEvents } from '#/server/discovery'
+import type { PublicEventCard } from '#/server/discovery'
 
 // Homepage van de publieke discovery-front-end (ontwerp: Homepage.dc.html).
 // Events komen uit de database (actieve events, alle organisaties).
@@ -25,6 +26,39 @@ export const Route = createFileRoute('/')({
 
 function prijsLabel(prijsVanafSrd: number | null, currency: ReturnType<typeof useCurrency>): string {
   return prijsVanafSrd === null ? 'Gratis' : formatPrice(prijsVanafSrd, currency)
+}
+
+// Hero-tegel: de flyer als het event er een heeft, anders het vaste streepdecor
+// uit het ontwerp — niet de categorie-pastel uit `coverStyle`, want de
+// tekstkleuren in de tegels zijn op die vaste kleuren afgestemd.
+function heroStyle(cover: string | null | undefined, a: string, b: string) {
+  return cover ? coverStyle(null, cover) : stripe(a, b)
+}
+
+// De twee kleine hero-tegels rechts. Boven een flyer moet het label wit staan
+// met een verlooplaag eronder; boven het lichte streepdecor juist donker, want
+// wit op pastel is onleesbaar. `titel` is de tekst uit het ontwerp die blijft
+// staan zolang er nog geen events zijn.
+function HeroTegel({
+  event,
+  titel,
+  kleuren: [a, b],
+}: {
+  event: PublicEventCard | undefined
+  titel: string
+  kleuren: [string, string]
+}) {
+  const cover = event?.cover
+  return (
+    <div className="relative min-h-[250px] overflow-hidden rounded-[16px]" style={heroStyle(cover, a, b)}>
+      {cover && (
+        <span aria-hidden className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/75 to-transparent" />
+      )}
+      <div className={`absolute inset-x-3 bottom-3 text-[13px] font-bold ${cover ? 'text-white' : 'text-[#0F172A]'}`}>
+        {event?.titel ?? titel}
+      </div>
+    </div>
+  )
 }
 
 function Home() {
@@ -98,7 +132,10 @@ function Home() {
           </div>
         </div>
         <div className="grid grid-cols-[1.3fr_1fr] gap-3.5">
-          <div className="relative row-span-2 overflow-hidden rounded-[20px]" style={stripe('#1E293B', '#0F172A')}>
+          <div
+            className="relative row-span-2 overflow-hidden rounded-[20px]"
+            style={heroStyle(featured[0]?.cover, '#1E293B', '#0F172A')}
+          >
             <div className="absolute left-3.5 top-3.5 rounded-full bg-white/90 px-3 py-[5px] text-[12px] font-bold text-[#0F172A]">
               Trending
             </div>
@@ -109,16 +146,8 @@ function Home() {
               <div className="text-[19px] font-extrabold">{featured[0]?.titel ?? 'Neon Night Festival'}</div>
             </div>
           </div>
-          <div className="relative min-h-[130px] overflow-hidden rounded-[16px]" style={stripe('#EFF6FF', '#DBEAFE')}>
-            <div className="absolute inset-x-2.5 bottom-2.5 text-[12px] font-bold text-[#0F172A]">
-              {featured[1]?.titel ?? 'Creative Workshop'}
-            </div>
-          </div>
-          <div className="relative min-h-[130px] overflow-hidden rounded-[16px]" style={stripe('#F0FDF4', '#DCFCE7')}>
-            <div className="absolute inset-x-2.5 bottom-2.5 text-[12px] font-bold text-[#0F172A]">
-              {featured[2]?.titel ?? 'Live: Future of AI Design'}
-            </div>
-          </div>
+          <HeroTegel event={featured[1]} titel="Creative Workshop" kleuren={['#EFF6FF', '#DBEAFE']} />
+          <HeroTegel event={featured[2]} titel="Live: Future of AI Design" kleuren={['#F0FDF4', '#DCFCE7']} />
         </div>
       </section>
 
@@ -162,9 +191,9 @@ function Home() {
               to="/events"
               search={{ categories: [cat.name] }}
               key={cat.name}
-              className="w-[190px] flex-none cursor-pointer"
+              className="w-[250px] flex-none cursor-pointer"
             >
-              <div className="mb-3 h-[130px] rounded-[16px]" style={cat.pattern} />
+              <div className="mb-3 h-[220px] rounded-[16px]" style={cat.pattern} />
               <div className="text-[15px] font-bold text-[#0F172A]">{cat.name}</div>
               <div className="text-[13px] text-[#64748B]">{cat.sub}</div>
             </Link>
@@ -197,7 +226,7 @@ function Home() {
                   params={{ eventId: ev.id }}
                   className="block overflow-hidden rounded-[16px] border border-[#E5E7EB] bg-white text-[#0F172A] shadow-[0_1px_3px_rgba(15,23,42,0.05)] transition hover:shadow-md"
                 >
-                  <div className="relative h-[170px]" style={coverStyle(ev.categorie, ev.cover)}>
+                  <div className="relative h-[250px]" style={coverStyle(ev.categorie, ev.cover)}>
                     {ev.categorie && (
                       <div className="absolute left-3 top-3 rounded-full bg-[#DBEAFE] px-3 py-1 text-[12px] font-bold text-[#2563EB]">
                         {ev.categorie}
@@ -242,7 +271,10 @@ function Home() {
                 key={ev.id}
                 className="flex flex-col gap-5 rounded-[16px] border border-[#E5E7EB] p-3.5 sm:flex-row sm:items-center"
               >
-                <div className="h-[88px] w-full flex-none rounded-[12px] sm:w-[120px]" style={coverStyle(ev.categorie, ev.cover)} />
+                <div
+                  className="h-[200px] w-full flex-none rounded-[12px] sm:w-[300px]"
+                  style={coverStyle(ev.categorie, ev.cover)}
+                />
                 <div className="flex-1">
                   <div className="mb-1.5 flex items-center gap-2.5 text-[12px] text-[#64748B]">
                     {ev.categorie && (
