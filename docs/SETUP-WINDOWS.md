@@ -294,10 +294,6 @@ Gebeurt als er nog resten van een oude installatie op de machine staan. Kijk met
 `psql -U postgres -h localhost -p 5433 -c "select 1;"` of dat lukt, en zet dan
 overal `5433` in je `DATABASE_URL`.
 
-**`Port 3000 is already in use`**
-Er draait nog een oude dev-server. Sluit het andere Git Bash-venster, of gebruik
-`npm run dev:test` op 3200.
-
 **Elk bestand lijkt gewijzigd na het clonen**
 Line endings. Zet het om met:
 `git config --global core.autocrlf input` en clone daarna opnieuw.
@@ -330,8 +326,25 @@ Je `.env` komt uit de oude opzet. Voeg `APP_ENV=development` toe (en `PORT` en
 `UPLOAD_DIR`, zie stap 6) of begin opnieuw vanaf `.env.example`.
 
 **`Port 3000 is already in use`**
-Iets anders draait er al. De poort komt nu uit `PORT` in je `.env`; zet die op een
-vrije waarde in plaats van het script aan te passen.
+Er draait nog een oude dev-server. Sluit dat Git Bash-venster met `Ctrl+C`. De
+poort komt nu uit `PORT` in je `.env`; heb je hem echt op een andere poort nodig,
+zet die daar in plaats van het script aan te passen.
+
+**`npm error code EPERM` … `unlink … lightningcss.win32-x64-msvc.node`**
+`npm ci` gooit `node_modules` eerst helemaal weg, en Windows staat dat niet toe
+zolang een proces een bestand daarin openhoudt. Bijna altijd een dev-server die nog
+draait, of VS Code. Zo los je het op:
+
+1. Kijk wat er draait: `tasklist | grep -i node`
+2. Sluit de dev-server met `Ctrl+C` in het betreffende venster, **en sluit VS
+   Code** — dat is vaak de schuldige. Moet het forceren:
+   `taskkill //F //IM node.exe` (dubbele slashes zijn nodig in Git Bash; dit sluit
+   álle node-processen).
+3. Opnieuw: `npm ci`. Faalt het nog: `rm -rf node_modules && npm ci`.
+
+Blijft het hangen, dan houdt je antivirus de map bezig; even wachten en opnieuw.
+Of gebruik `npm install` — dat verwijdert `node_modules` niet en werkt hem alleen
+bij, wat met een actuele `package-lock.json` hier gelijkwaardig is.
 
 **`Found ~/.bashrc but no ~/.bash_profile`**
 Onschuldig. Git Bash maakt de ontbrekende `~/.bash_profile` zelf aan en laadt
