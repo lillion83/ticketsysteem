@@ -16,7 +16,6 @@ import {
 } from '#/server/eventContent'
 import { eventCategories } from '#/components/discovery/data'
 import { CoverUpload } from '#/components/cover-upload'
-import type { Cover } from '#/components/cover-upload'
 
 type Categorie = (typeof eventCategories)[number]
 
@@ -109,13 +108,7 @@ function EventSectie() {
   const [status, setStatus] = useState(event.status)
   const [categorie, setCategorie] = useState<Categorie | ''>(event.categorie ?? '')
   const [beschrijving, setBeschrijving] = useState(event.beschrijving ?? '')
-  const [cover, setCover] = useState<Cover>({
-    url: event.cover_afbeelding_url ?? '',
-    breedte: event.cover_breedte,
-    hoogte: event.cover_hoogte,
-    focusX: event.cover_focus_x,
-    focusY: event.cover_focus_y,
-  })
+  const [coverUrl, setCoverUrl] = useState(event.cover_afbeelding_url ?? '')
   const [fout, setFout] = useState<string | null>(null)
   const [ok, setOk] = useState(false)
 
@@ -135,11 +128,7 @@ function EventSectie() {
           status,
           categorie: categorie || null,
           beschrijving: beschrijving || null,
-          cover_afbeelding_url: cover.url || null,
-          cover_breedte: cover.breedte,
-          cover_hoogte: cover.hoogte,
-          cover_focus_x: cover.focusX,
-          cover_focus_y: cover.focusY,
+          cover_afbeelding_url: coverUrl || null,
         },
       })
       setOk(true)
@@ -194,7 +183,7 @@ function EventSectie() {
           <textarea value={beschrijving} onChange={(e) => setBeschrijving(e.target.value)} rows={4} className={inputCls} />
         </Veld>
         <Veld label="Cover-afbeelding (publiek)">
-          <CoverUpload value={cover} onChange={setCover} />
+          <CoverUpload value={coverUrl} onChange={setCoverUrl} />
         </Veld>
         {fout && <p className="text-[14px] font-semibold text-[#DC2626]">{fout}</p>}
         {ok && <p className="text-[14px] font-semibold text-[#16A34A]">Opgeslagen ✓</p>}

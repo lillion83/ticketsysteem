@@ -389,11 +389,14 @@ Geen faseletters, wel wezenlijke wijzigingen:
   de datums. Eigen KPI's per fase, plus een Event Health Score en een
   Inzichten-blok. Route:
   `src/routes/admin/events.$eventId_.dashboard.tsx`.
-- **Cover-afbeeldingen** (`8e6a4fb` t/m `a6a54d2`): uploaden in plaats van een
-  URL invullen, met een door de organisator gekozen focuspunt, een banner die
-  zich aan het formaat van de flyer aanpast, en een lightbox voor de volledige
-  flyer. Bestanden staan in `uploads/`, buiten de build-output, zodat een deploy
-  ze niet raakt.
+- **Cover-afbeeldingen** (`8e6a4fb`, `a6a54d2`): uploaden in plaats van een URL
+  invullen, plus een lightbox die de volledige flyer toont via "Bekijk volledige
+  flyer" op de banner. Bestanden staan in `uploads/`, buiten de build-output,
+  zodat een deploy ze niet raakt. Er zat tussentijds ook een meebewegende banner
+  (`5aa80b1`) en een door de organisator gekozen focuspunt (`54229ed`) in; die
+  zijn er weer uit gehaald, want de lightbox lost het probleem al op en hoe de
+  flyer in de banner valt maakt daarmee niet uit. De banner snijdt gewoon bij
+  vanuit het midden.
 - **Mijn Tickets herzien** (`b725148`): tickets gegroepeerd per event, met een
   detailpagina per event.
 - **Test-omgeving** (`0a693e3`): aparte test-database `ticketsysteem_test` op

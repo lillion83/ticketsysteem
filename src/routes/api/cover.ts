@@ -26,9 +26,7 @@ export const Route = createFileRoute('/api/cover')({
           if (!(file instanceof File)) {
             return Response.json({ error: 'Geen bestand ontvangen' }, { status: 400 })
           }
-          // Antwoord: { url, breedte, hoogte } — de afmetingen bepalen straks of
-          // de banner de afbeelding bijsnijdt of hem heel laat zien.
-          return Response.json(await bewaarAfbeelding(file))
+          return Response.json({ url: await bewaarAfbeelding(file) })
         } catch (err) {
           const bericht = err instanceof Error ? err.message : 'Upload mislukt'
           return Response.json({ error: bericht }, { status: 400 })

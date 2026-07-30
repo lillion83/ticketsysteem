@@ -35,47 +35,20 @@ const categoryColors: Record<string, [string, string]> = {
   'Food & Drink': ['#FFFBEB', '#FEF3C7'],
 }
 
-// Het punt dat in beeld blijft als er bijgesneden wordt. De organisator klikt
-// het aan bij de upload; zonder keuze is het het midden (het oude gedrag).
-export type Focus = { x: number | null; y: number | null }
-
-export function focusPositie(focus?: Focus | null): string {
-  return `${focus?.x ?? 50}% ${focus?.y ?? 50}%`
-}
-
 export function coverStyle(
   categorie: string | null,
   cover?: string | null,
-  focus?: Focus | null,
 ): CSSProperties {
   if (cover)
     return {
       backgroundImage: `url(${cover})`,
       backgroundSize: 'cover',
-      backgroundPosition: focusPositie(focus),
+      backgroundPosition: 'center',
     }
   const [a, b] = categoryColors[categorie ?? ''] ?? ['#F1F5F9', '#E2E8F0']
   return stripe(a, b)
 }
 
-// Vanaf deze verhouding (breedte ÷ hoogte) vult een afbeelding de banner zonder
-// dat er iets wezenlijks wegvalt. Alles daaronder — vierkante Instagram-posts,
-// portrait stories, 4:3-flyers — zou hard afgesneden worden, vaak precies door
-// de titel of de line-up heen.
-export const BANNER_RATIO = 2
-
-/**
- * De banner boven een event. Flyers komen van social media en hebben sterk
- * wisselende formaten, dus kiest de banner zelf hoe hij de afbeelding toont:
- *
- * - breed genoeg (≥ 2:1), of afmetingen onbekend → vullen en bijsnijden,
- *   precies zoals het altijd was (events van vóór de afmeting-kolommen en
- *   handmatig ingevulde externe URL's blijven zo werken);
- * - smaller → de hele afbeelding in beeld, met een uitvergrote, vervaagde
- *   versie van diezelfde afbeelding als achtergrond in plaats van witruimte.
- *
- * `children` (verlooplaag, titel) ligt bovenop; de aanroeper bepaalt de hoogte.
- */
 /**
  * Uitvergrote, vervaagde versie van de afbeelding als achtergrond, zodat er
  * naast een niet-passende flyer geen kale marges staan. Het opschalen houdt de
@@ -91,45 +64,34 @@ function BlurAchtergrond({ cover }: { cover: string }) {
   )
 }
 
+/**
+ * De banner boven een event: de cover bijgesneden vanuit het midden, met de
+ * hele flyer een klik verderop in een lightbox. Hoe de flyer in de banner valt
+ * doet daarom niet zo veel — wie alles wil lezen opent hem groot.
+ *
+ * `children` (verlooplaag, titel) ligt bovenop; de aanroeper bepaalt de hoogte.
+ */
 export function EventBanner({
   categorie,
   cover,
-  breedte,
-  hoogte,
-  focus,
   className = '',
   children,
 }: {
   categorie: string | null
   cover?: string | null
-  breedte?: number | null
-  hoogte?: number | null
-  focus?: Focus | null
   className?: string
   children?: ReactNode
 }) {
   const [lightboxOpen, setLightboxOpen] = useState(false)
-  const ratio = cover && breedte && hoogte ? breedte / hoogte : null
-  const heelTonen = ratio !== null && ratio < BANNER_RATIO
 
   return (
     <>
-      <div
-        className={heelTonen ? `bg-[#0F172A] ${className}` : className}
-        style={heelTonen ? undefined : coverStyle(categorie, cover, focus)}
-      >
-        {heelTonen && cover && (
-          <>
-            <BlurAchtergrond cover={cover} />
-            <img src={cover} alt="" className="absolute inset-0 h-full w-full object-contain" />
-          </>
-        )}
+      <div className={className} style={coverStyle(categorie, cover)}>
         {children}
-        {/* Organisatoren zetten prijzen, line-up en tijden ín de flyer. Ook een
-            nette crop kan daar iets van afsnijden, dus altijd een uitweg naar
-            de hele flyer — ook in contain-modus, want ook dan kan de flyer te
-            klein zijn om alles te lezen. Een <button> is vanzelf met het
-            toetsenbord te bedienen; de knop ligt over de hele banner. */}
+        {/* Organisatoren zetten prijzen, line-up en tijden ín de flyer, en een
+            crop kan daar iets van afsnijden. Dus altijd een uitweg naar de hele
+            flyer. Een <button> is vanzelf met het toetsenbord te bedienen; de
+            knop ligt over de hele banner. */}
         {cover && (
           <button
             type="button"

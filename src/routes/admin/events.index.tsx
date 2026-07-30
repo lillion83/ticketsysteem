@@ -2,8 +2,7 @@ import { Link, createFileRoute, useRouter } from '@tanstack/react-router'
 import { useState } from 'react'
 import { createEvent, listEvents } from '#/server/events'
 import { eventCategories } from '#/components/discovery/data'
-import { CoverUpload, LEGE_COVER } from '#/components/cover-upload'
-import type { Cover } from '#/components/cover-upload'
+import { CoverUpload } from '#/components/cover-upload'
 
 type Categorie = (typeof eventCategories)[number]
 
@@ -29,7 +28,7 @@ function EventsOverzicht() {
   const [reEntry, setReEntry] = useState(false)
   const [categorie, setCategorie] = useState<Categorie | ''>('')
   const [beschrijving, setBeschrijving] = useState('')
-  const [cover, setCover] = useState<Cover>(LEGE_COVER)
+  const [coverUrl, setCoverUrl] = useState('')
   const [fout, setFout] = useState<string | null>(null)
   const [bezig, setBezig] = useState(false)
 
@@ -48,11 +47,7 @@ function EventsOverzicht() {
           status: 'concept',
           categorie: categorie || null,
           beschrijving: beschrijving || null,
-          cover_afbeelding_url: cover.url || null,
-          cover_breedte: cover.breedte,
-          cover_hoogte: cover.hoogte,
-          cover_focus_x: cover.focusX,
-          cover_focus_y: cover.focusY,
+          cover_afbeelding_url: coverUrl || null,
         },
       })
       setOpen(false)
@@ -63,7 +58,7 @@ function EventsOverzicht() {
       setReEntry(false)
       setCategorie('')
       setBeschrijving('')
-      setCover(LEGE_COVER)
+      setCoverUrl('')
       router.invalidate()
     } catch (err) {
       setFout(err instanceof Error ? err.message : 'Opslaan mislukt')
@@ -117,7 +112,7 @@ function EventsOverzicht() {
             <textarea value={beschrijving} onChange={(e) => setBeschrijving(e.target.value)} rows={3} className={inputCls} />
           </Veld>
           <Veld label="Cover-afbeelding (publiek)">
-            <CoverUpload value={cover} onChange={setCover} />
+            <CoverUpload value={coverUrl} onChange={setCoverUrl} />
           </Veld>
           <label className="flex items-center gap-2 text-[14px]">
             <input type="checkbox" checked={reEntry} onChange={(e) => setReEntry(e.target.checked)} className="h-4 w-4 accent-[#2563EB]" />
