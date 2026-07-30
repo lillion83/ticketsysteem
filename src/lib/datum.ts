@@ -46,7 +46,11 @@ export function formatTimeRange(start: Date, eind: Date): string {
 // Bewust op de lokale tijd van de bezoeker: een filter mag benaderend zijn.
 
 function zelfdeDag(a: Date, b: Date): boolean {
-  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  )
 }
 
 /** Valt de datum op vandaag? */
@@ -54,17 +58,32 @@ export function isVandaag(d: Date): boolean {
   return zelfdeDag(d, new Date())
 }
 
-/** Valt de datum op het komende weekend (zaterdag/zondag binnen 7 dagen)? */
+/**
+ * Valt de datum op het komende weekend (vrijdag t/m zondag binnen 7 dagen)?
+ *
+ * Vrijdag telt mee: het uitgaansweekend begint hier vrijdagavond, en het
+ * weekendblok op de homepage toont vr–zo. Deze functie is de enige definitie van
+ * "dit weekend" — de homepage en het datumfilter op /events delen hem, zodat de
+ * twee niet elk een eigen weekend krijgen.
+ */
 export function isDitWeekend(d: Date): boolean {
   const nu = new Date()
   const overZeven = new Date(nu.getTime() + 7 * 24 * 60 * 60 * 1000)
-  const dag = d.getDay() // 0 = zondag, 6 = zaterdag
-  return (dag === 0 || dag === 6) && d >= new Date(nu.getFullYear(), nu.getMonth(), nu.getDate()) && d <= overZeven
+  const dag = d.getDay() // 0 = zondag, 5 = vrijdag, 6 = zaterdag
+  return (
+    (dag === 0 || dag === 5 || dag === 6) &&
+    d >= new Date(nu.getFullYear(), nu.getMonth(), nu.getDate()) &&
+    d <= overZeven
+  )
 }
 
 /** Valt de datum op een gekozen dag (YYYY-MM-DD)? */
 export function isOpDatum(d: Date, iso: string): boolean {
   const [jaar, maand, dag] = iso.split('-').map(Number)
   if (!jaar || !maand || !dag) return true
-  return d.getFullYear() === jaar && d.getMonth() + 1 === maand && d.getDate() === dag
+  return (
+    d.getFullYear() === jaar &&
+    d.getMonth() + 1 === maand &&
+    d.getDate() === dag
+  )
 }

@@ -37,7 +37,7 @@ async function seed() {
       locatie: 'Torarica Hotel, Paramaribo',
       re_entry_toegestaan: false,
       status: 'actief',
-      categorie: 'Tech',
+      categorie: 'Business & Netwerk',
       beschrijving:
         'Ontdek de transformerende kracht van Artificial Intelligence. De Global AI & Big Data Expo 2026 is de toonaangevende conferentie om te ontdekken hoe AI en Big Data industrieën ontwrichten.\n\nWe duiken diep in predictive analytics, neurale netwerken en automatiseringsstrategieën. Doe praktische kennis op over het benutten van data voor bedrijfsgroei.',
       cover_afbeelding_url: null,

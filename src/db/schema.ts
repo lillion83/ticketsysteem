@@ -39,14 +39,21 @@ export const gebruikerRol = pgEnum('gebruiker_rol', [
 
 // Vaste categorie-taxonomie voor de publieke discovery-front-end. Spiegelt de
 // categorieën uit het ontwerp; UI-labels blijven Nederlands.
+//
+// Deze acht vervingen op 2026-07-30 de oude, uit een generiek ontwerp overgenomen
+// reeks (Muziek, Tech, Business, Food & Drink, Health, Art & Design, Sports). Die
+// paste niet op wat er in Suriname te doen is: geen Nightlife, geen Cultuur &
+// Festival, wél een Tech-categorie waar niets in zat. Migratie 0011 zet bestaande
+// rijen om; die mapping staat in het migratiebestand.
 export const eventCategorie = pgEnum('event_categorie', [
-  'Muziek',
-  'Tech',
-  'Business',
-  'Food & Drink',
-  'Health',
-  'Art & Design',
-  'Sports',
+  'Muziek & Concerten',
+  'Nightlife',
+  'Cultuur & Festival',
+  'Food & Drinks',
+  'Business & Netwerk',
+  'Sport & Outdoor',
+  'Workshops',
+  'Familie & Kids',
 ])
 
 // --- Better Auth (core) ---

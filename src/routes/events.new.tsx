@@ -1,6 +1,12 @@
-import { createFileRoute, Link, redirect, useNavigate } from '@tanstack/react-router'
+import {
+  createFileRoute,
+  Link,
+  redirect,
+  useNavigate,
+} from '@tanstack/react-router'
 import { useState } from 'react'
 import { SiteNav, SitePage, stripe } from '#/components/discovery/site'
+import { eventCategories } from '#/components/discovery/data'
 import { CoverUpload } from '#/components/cover-upload'
 import { createFullEvent } from '#/server/events'
 import type { FullEventInput } from '#/server/events'
@@ -14,24 +20,37 @@ import { getCurrentUser } from '#/server/session'
 export const Route = createFileRoute('/events/new')({
   beforeLoad: async () => {
     const user = await getCurrentUser()
-    if (!user) throw redirect({ to: '/login', search: { redirect: '/events/new' } })
+    if (!user)
+      throw redirect({ to: '/login', search: { redirect: '/events/new' } })
     // Alleen organisatoren (met organisatie) mogen publiceren. Een ingelogde
     // koper zonder organisatie sturen we niet weg, maar door de organisator-
     // onboarding (fase H) en daarna terug hierheen.
     if (!user.organizationId) {
-      throw redirect({ to: '/word-organisator', search: { redirect: '/events/new' } })
+      throw redirect({
+        to: '/word-organisator',
+        search: { redirect: '/events/new' },
+      })
     }
   },
   component: OrganiseerEvent,
 })
 
-const categoryOptions = ['Muziek', 'Tech', 'Business', 'Food & Drink', 'Health', 'Art & Design', 'Sports']
+// Eén bron voor de categorielijst: `eventCategories` spiegelt de enum in het
+// schema. Dit formulier had zijn eigen kopie en die liep bij de eerste
+// enum-wijziging meteen achter.
+const categoryOptions = eventCategories
 const rolesByCategory: Record<string, Array<string>> = {
-  Muziek: ['DJ', 'Band', 'Zanger', 'MC', 'Spreker'],
-  Business: ['Spreker/Panel'],
+  'Muziek & Concerten': ['DJ', 'Band', 'Zanger', 'MC', 'Spreker'],
+  Nightlife: ['DJ', 'MC', 'Host'],
+  'Business & Netwerk': ['Spreker/Panel'],
+  Workshops: ['Spreker/Panel', 'Begeleider'],
 }
 const defaultRoles = ['DJ', 'Band', 'Zanger', 'MC', 'Spreker']
-const stepLabels = ['Event Info', 'Tickets & Prijzen', 'Controleren & Publiceren']
+const stepLabels = [
+  'Event Info',
+  'Tickets & Prijzen',
+  'Controleren & Publiceren',
+]
 
 type LineupEntry = { name: string; role: string }
 type Tier = {
@@ -62,7 +81,7 @@ function OrganiseerEvent() {
   const [fout, setFout] = useState<string | null>(null)
   const [form, setForm] = useState({
     title: 'Global AI & Big Data Expo 2026',
-    category: 'Muziek',
+    category: 'Muziek & Concerten',
     description: 'Een avond vol live optredens, DJ-sets en visuele kunst.',
     dateStart: '2026-03-14',
     timeStart: '19:00',
@@ -104,9 +123,12 @@ function OrganiseerEvent() {
   ])
   const [nextTierId, setNextTierId] = useState(3)
 
-  const isMusic = form.category === 'Muziek'
+  // Muziek en nachtleven draaien om de line-up, dus die staat daar uitgeklapt.
+  const isMusic =
+    form.category === 'Muziek & Concerten' || form.category === 'Nightlife'
   const roles = rolesByCategory[form.category] ?? defaultRoles
-  const lineupSectionLabel = form.category === 'Business' ? 'Spreker/Panel' : 'Line-up'
+  const lineupSectionLabel =
+    form.category === 'Business & Netwerk' ? 'Spreker/Panel' : 'Line-up'
 
   // Combineert een datum- en tijd-invoer tot een ISO-string in de lokale tijd
   // van de organisator (zelfde aanpak als het admin-formulier).
@@ -128,7 +150,11 @@ function OrganiseerEvent() {
     }
     const payload: FullEventInput = {
       naam: form.title,
-      categorie: (categoryOptions.includes(form.category) ? form.category : null) as FullEventInput['categorie'],
+      // `categoryOptions` is een readonly tuple van letterlijke waarden; de
+      // formulierstate is een gewone string, vandaar de verbreding.
+      categorie: ((categoryOptions as readonly string[]).includes(form.category)
+        ? form.category
+        : null) as FullEventInput['categorie'],
       beschrijving: form.description || null,
       datum_start: combineerISO(form.dateStart, form.timeStart),
       datum_eind: combineerISO(form.dateEnd, form.timeEnd),
@@ -160,7 +186,10 @@ function OrganiseerEvent() {
     }
   }
 
-  function updateField<TKey extends keyof typeof form>(field: TKey, value: (typeof form)[TKey]) {
+  function updateField<TKey extends keyof typeof form>(
+    field: TKey,
+    value: (typeof form)[TKey],
+  ) {
     setForm((f) => ({ ...f, [field]: value }))
   }
 
@@ -171,8 +200,14 @@ function OrganiseerEvent() {
     setLineupName('')
   }
 
-  function updateTier<TKey extends keyof Tier>(id: number, field: TKey, value: Tier[TKey]) {
-    setTiers((ts) => ts.map((t) => (t.id === id ? { ...t, [field]: value } : t)))
+  function updateTier<TKey extends keyof Tier>(
+    id: number,
+    field: TKey,
+    value: Tier[TKey],
+  ) {
+    setTiers((ts) =>
+      ts.map((t) => (t.id === id ? { ...t, [field]: value } : t)),
+    )
   }
 
   function addTier() {
@@ -202,9 +237,14 @@ function OrganiseerEvent() {
           <Link to="/" className="text-[#64748B] hover:text-[#0F172A]">
             Home
           </Link>{' '}
-          / <span className="font-semibold text-[#0F172A]">Organiseer een Event</span>
+          /{' '}
+          <span className="font-semibold text-[#0F172A]">
+            Organiseer een Event
+          </span>
         </div>
-        <h1 className="mb-7 text-[32px] font-extrabold">Organiseer een Event</h1>
+        <h1 className="mb-7 text-[32px] font-extrabold">
+          Organiseer een Event
+        </h1>
 
         {/* Stepper */}
         <div className="mb-11 flex items-center justify-center gap-4">
@@ -213,11 +253,18 @@ function OrganiseerEvent() {
             const active = n === step
             return (
               <div key={n} className="flex items-center gap-4">
-                <button onClick={() => setStep(n as 1 | 2 | 3)} className="flex items-center gap-2.5">
+                <button
+                  onClick={() => setStep(n as 1 | 2 | 3)}
+                  className="flex items-center gap-2.5"
+                >
                   <span
                     className="flex h-[34px] w-[34px] items-center justify-center rounded-full text-[14px] font-extrabold"
                     style={{
-                      background: done ? '#22C55E' : active ? '#2563EB' : '#F1F5F9',
+                      background: done
+                        ? '#22C55E'
+                        : active
+                          ? '#2563EB'
+                          : '#F1F5F9',
                       color: done || active ? '#fff' : '#94A3B8',
                       border: active ? '2px solid #2563EB' : 'none',
                     }}
@@ -226,12 +273,19 @@ function OrganiseerEvent() {
                   </span>
                   <span
                     className="hidden text-[14.5px] font-bold sm:inline"
-                    style={{ color: done ? '#0F172A' : active ? '#2563EB' : '#94A3B8' }}
+                    style={{
+                      color: done ? '#0F172A' : active ? '#2563EB' : '#94A3B8',
+                    }}
                   >
                     {stepLabels[i]}
                   </span>
                 </button>
-                {n < 3 && <div className="h-0.5 w-14" style={{ background: n < step ? '#22C55E' : '#E5E7EB' }} />}
+                {n < 3 && (
+                  <div
+                    className="h-0.5 w-14"
+                    style={{ background: n < step ? '#22C55E' : '#E5E7EB' }}
+                  />
+                )}
               </div>
             )
           })}
@@ -317,7 +371,10 @@ function OrganiseerEvent() {
                   onChange={(v) => updateField('location', v)}
                   placeholder="Adres of venue naam"
                 />
-                <div className="relative mt-3 h-[100px] rounded-[12px]" style={stripe('#F0FDF4', '#DCFCE7')}>
+                <div
+                  className="relative mt-3 h-[100px] rounded-[12px]"
+                  style={stripe('#F0FDF4', '#DCFCE7')}
+                >
                   <div className="absolute left-1/2 top-1/2 h-[22px] w-[22px] -translate-x-1/2 -translate-y-1/2 rounded-full border-[3px] border-white bg-[#2563EB] shadow-[0_2px_6px_rgba(0,0,0,0.3)]" />
                 </div>
               </Field>
@@ -325,7 +382,9 @@ function OrganiseerEvent() {
               {/* Line-up: prominent voor Muziek, anders inklapbaar */}
               {isMusic ? (
                 <div className="rounded-[14px] border border-[#E5E7EB] bg-[#F8FAFC] p-5">
-                  <div className="mb-3.5 text-[15px] font-extrabold">Artiesten / Line-up</div>
+                  <div className="mb-3.5 text-[15px] font-extrabold">
+                    Artiesten / Line-up
+                  </div>
                   <LineupEditor
                     lineupName={lineupName}
                     setLineupName={setLineupName}
@@ -334,7 +393,9 @@ function OrganiseerEvent() {
                     roles={roles}
                     onAdd={addLineup}
                     lineup={lineup}
-                    onRemove={(idx) => setLineup((l) => l.filter((_, i) => i !== idx))}
+                    onRemove={(idx) =>
+                      setLineup((l) => l.filter((_, i) => i !== idx))
+                    }
                   />
                 </div>
               ) : (
@@ -351,19 +412,26 @@ function OrganiseerEvent() {
                       roles={roles}
                       onAdd={addLineup}
                       lineup={lineup}
-                      onRemove={(idx) => setLineup((l) => l.filter((_, i) => i !== idx))}
+                      onRemove={(idx) =>
+                        setLineup((l) => l.filter((_, i) => i !== idx))
+                      }
                     />
                   </div>
                 </details>
               )}
 
               <Field label="Organisatornaam">
-                <TextInput value={form.organizer} onChange={(v) => updateField('organizer', v)} />
+                <TextInput
+                  value={form.organizer}
+                  onChange={(v) => updateField('organizer', v)}
+                />
               </Field>
             </div>
 
             <div className="mt-8 flex justify-end">
-              <PrimaryButton onClick={() => setStep(2)}>Volgende: Tickets & Prijzen →</PrimaryButton>
+              <PrimaryButton onClick={() => setStep(2)}>
+                Volgende: Tickets & Prijzen →
+              </PrimaryButton>
             </div>
           </div>
         )}
@@ -371,19 +439,29 @@ function OrganiseerEvent() {
         {/* Stap 2 — Tickets & Prijzen */}
         {step === 2 && (
           <div className="rounded-[18px] border border-[#E5E7EB] p-8">
-            <h2 className="mb-6 text-[20px] font-extrabold">Tickets & Prijzen</h2>
+            <h2 className="mb-6 text-[20px] font-extrabold">
+              Tickets & Prijzen
+            </h2>
             <div className="flex flex-col gap-5">
               {tiers.map((t) => (
-                <div key={t.id} className="relative rounded-[16px] border border-[#E5E7EB] p-[22px]">
+                <div
+                  key={t.id}
+                  className="relative rounded-[16px] border border-[#E5E7EB] p-[22px]"
+                >
                   <button
-                    onClick={() => setTiers((ts) => ts.filter((x) => x.id !== t.id))}
+                    onClick={() =>
+                      setTiers((ts) => ts.filter((x) => x.id !== t.id))
+                    }
                     className="absolute right-4 top-4 text-[13px] font-bold text-[#94A3B8] hover:text-[#EF4444]"
                   >
                     Verwijderen ✕
                   </button>
                   <div className="mb-4 grid gap-4 sm:grid-cols-[2fr_1fr]">
                     <SmallField label="Tiernaam">
-                      <SmallInput value={t.name} onChange={(v) => updateTier(t.id, 'name', v)} />
+                      <SmallInput
+                        value={t.name}
+                        onChange={(v) => updateTier(t.id, 'name', v)}
+                      />
                     </SmallField>
                     <SmallField label="Beschikbaar aantal">
                       <SmallInput
@@ -395,7 +473,10 @@ function OrganiseerEvent() {
                   </div>
                   <div className="mb-4">
                     <SmallField label="Beschrijving">
-                      <SmallInput value={t.desc} onChange={(v) => updateTier(t.id, 'desc', v)} />
+                      <SmallInput
+                        value={t.desc}
+                        onChange={(v) => updateTier(t.id, 'desc', v)}
+                      />
                     </SmallField>
                   </div>
                   <div className="mb-4 grid gap-4 sm:grid-cols-2">
@@ -403,12 +484,16 @@ function OrganiseerEvent() {
                       <SmallInput
                         type="number"
                         value={String(t.priceSRD)}
-                        onChange={(v) => updateTier(t.id, 'priceSRD', Number(v))}
+                        onChange={(v) =>
+                          updateTier(t.id, 'priceSRD', Number(v))
+                        }
                       />
                     </SmallField>
                   </div>
                   <div className="mb-3.5">
-                    <label className="mb-2 block text-[12.5px] font-bold">Features</label>
+                    <label className="mb-2 block text-[12.5px] font-bold">
+                      Features
+                    </label>
                     <div className="flex flex-col gap-2">
                       {t.features.map((f, idx) => (
                         <div key={idx} className="flex items-center gap-2">
@@ -429,7 +514,9 @@ function OrganiseerEvent() {
                               updateTier(
                                 t.id,
                                 'features',
-                                t.features.map((x, i) => (i === idx ? e.target.value : x)),
+                                t.features.map((x, i) =>
+                                  i === idx ? e.target.value : x,
+                                ),
                               )
                             }
                             className="flex-1 rounded-[8px] border border-[#E5E7EB] bg-[#F8FAFC] px-2.5 py-2 text-[13.5px] outline-none focus:border-[#2563EB]"
@@ -450,7 +537,9 @@ function OrganiseerEvent() {
                       ))}
                     </div>
                     <button
-                      onClick={() => updateTier(t.id, 'features', [...t.features, ''])}
+                      onClick={() =>
+                        updateTier(t.id, 'features', [...t.features, ''])
+                      }
                       className="mt-2.5 text-[13px] font-bold text-[#2563EB] hover:text-[#1D4ED8]"
                     >
                       + Kenmerk toevoegen
@@ -460,14 +549,17 @@ function OrganiseerEvent() {
                     <input
                       type="checkbox"
                       checked={t.earlyBird}
-                      onChange={() => updateTier(t.id, 'earlyBird', !t.earlyBird)}
+                      onChange={() =>
+                        updateTier(t.id, 'earlyBird', !t.earlyBird)
+                      }
                       className="h-4 w-4 accent-[#2563EB]"
                     />
                     Vroegboekkorting
                   </label>
                   {t.earlyBird && (
                     <div className="mt-2.5 text-[13px] text-[#64748B]">
-                      Originele prijs (doorgestreept): <s>SRD {t.earlyBirdOriginalSRD}</s> /{' '}
+                      Originele prijs (doorgestreept):{' '}
+                      <s>SRD {t.earlyBirdOriginalSRD}</s> /{' '}
                       <s>${t.earlyBirdOriginalUSD}</s>
                     </div>
                   )}
@@ -482,8 +574,12 @@ function OrganiseerEvent() {
             </button>
 
             <div className="mt-8 flex justify-between">
-              <SecondaryButton onClick={() => setStep(1)}>← Vorige</SecondaryButton>
-              <PrimaryButton onClick={() => setStep(3)}>Volgende: Controleren →</PrimaryButton>
+              <SecondaryButton onClick={() => setStep(1)}>
+                ← Vorige
+              </SecondaryButton>
+              <PrimaryButton onClick={() => setStep(3)}>
+                Volgende: Controleren →
+              </PrimaryButton>
             </div>
           </div>
         )}
@@ -495,13 +591,19 @@ function OrganiseerEvent() {
               className="relative mb-6 h-[220px] overflow-hidden rounded-[18px]"
               style={
                 cover
-                  ? { backgroundImage: `url(${cover})`, backgroundSize: 'cover', backgroundPosition: 'center' }
+                  ? {
+                      backgroundImage: `url(${cover})`,
+                      backgroundSize: 'cover',
+                      backgroundPosition: 'center',
+                    }
                   : stripe('#1E293B', '#0F172A')
               }
             >
               <div className="absolute inset-0 bg-[linear-gradient(transparent_30%,rgba(0,0,0,0.75))]" />
               <div className="absolute bottom-5 left-6 text-white">
-                <div className="mb-1.5 text-[24px] font-extrabold">{form.title || 'Naamloos Event'}</div>
+                <div className="mb-1.5 text-[24px] font-extrabold">
+                  {form.title || 'Naamloos Event'}
+                </div>
                 <div className="text-[13px] opacity-90">
                   {(form.dateStart || '—') + ' · ' + (form.timeStart || '—')} ·{' '}
                   {form.location || 'Locatie nog niet ingevuld'}
@@ -510,14 +612,18 @@ function OrganiseerEvent() {
             </div>
 
             <div className="mb-5 rounded-[16px] border border-[#E5E7EB] p-[26px]">
-              <h3 className="mb-3.5 text-[17px] font-extrabold">Samenvatting</h3>
+              <h3 className="mb-3.5 text-[17px] font-extrabold">
+                Samenvatting
+              </h3>
               <dl className="grid grid-cols-[140px_1fr] gap-x-4 gap-y-2.5 text-[14px]">
                 <dt className="text-[#64748B]">Categorie</dt>
                 <dd className="m-0 font-semibold">{form.category}</dd>
                 <dt className="text-[#64748B]">Beschrijving</dt>
                 <dd className="m-0 font-semibold">{form.description || '—'}</dd>
                 <dt className="text-[#64748B]">Locatie</dt>
-                <dd className="m-0 font-semibold">{form.location || 'Locatie nog niet ingevuld'}</dd>
+                <dd className="m-0 font-semibold">
+                  {form.location || 'Locatie nog niet ingevuld'}
+                </dd>
                 <dt className="text-[#64748B]">Organisator</dt>
                 <dd className="m-0 font-semibold">{form.organizer}</dd>
               </dl>
@@ -554,8 +660,12 @@ function OrganiseerEvent() {
                     className="flex items-center justify-between rounded-[12px] border border-[#E5E7EB] p-[14px_18px]"
                   >
                     <div>
-                      <div className="text-[14.5px] font-extrabold">{t.name}</div>
-                      <div className="text-[12.5px] text-[#64748B]">{t.qty} beschikbaar</div>
+                      <div className="text-[14.5px] font-extrabold">
+                        {t.name}
+                      </div>
+                      <div className="text-[12.5px] text-[#64748B]">
+                        {t.qty} beschikbaar
+                      </div>
                     </div>
                     <div className="font-extrabold text-[#2563EB]">
                       SRD {t.priceSRD}
@@ -565,16 +675,26 @@ function OrganiseerEvent() {
               </div>
             </div>
 
-            {fout && <p className="mb-4 text-[14px] font-semibold text-[#EF4444]">{fout}</p>}
+            {fout && (
+              <p className="mb-4 text-[14px] font-semibold text-[#EF4444]">
+                {fout}
+              </p>
+            )}
             <div className="flex flex-col justify-between gap-3 sm:flex-row">
               <SecondaryButton onClick={() => setStep(2)} disabled={bezig}>
                 ← Vorige
               </SecondaryButton>
               <div className="flex gap-3">
-                <SecondaryButton onClick={() => void verzenden('concept')} disabled={bezig}>
+                <SecondaryButton
+                  onClick={() => void verzenden('concept')}
+                  disabled={bezig}
+                >
                   {bezig ? 'Bezig…' : 'Opslaan als Concept'}
                 </SecondaryButton>
-                <PrimaryButton onClick={() => void verzenden('actief')} disabled={bezig}>
+                <PrimaryButton
+                  onClick={() => void verzenden('actief')}
+                  disabled={bezig}
+                >
                   {bezig ? 'Bezig…' : 'Publiceer Event'}
                 </PrimaryButton>
               </div>
@@ -588,7 +708,13 @@ function OrganiseerEvent() {
 
 // ── Herbruikbare veld-/knopcomponenten ──────────────────────────────────────
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({
+  label,
+  children,
+}: {
+  label: string
+  children: React.ReactNode
+}) {
   return (
     <div>
       <label className="mb-1.5 block text-[13px] font-bold">{label}</label>
@@ -597,7 +723,13 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   )
 }
 
-function SmallField({ label, children }: { label: string; children: React.ReactNode }) {
+function SmallField({
+  label,
+  children,
+}: {
+  label: string
+  children: React.ReactNode
+}) {
   return (
     <div>
       <label className="mb-1.5 block text-[12.5px] font-bold">{label}</label>
@@ -746,7 +878,10 @@ function LineupEditor({
             <span className="rounded-full bg-[#DBEAFE] px-2 py-0.5 text-[11.5px] font-bold text-[#2563EB]">
               {l.role}
             </span>
-            <button onClick={() => onRemove(i)} className="font-bold text-[#94A3B8] hover:text-[#EF4444]">
+            <button
+              onClick={() => onRemove(i)}
+              className="font-bold text-[#94A3B8] hover:text-[#EF4444]"
+            >
               ✕
             </button>
           </span>

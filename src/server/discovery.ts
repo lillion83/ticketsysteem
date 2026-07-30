@@ -31,12 +31,20 @@ export type PublicEventCard = {
   locatie: string | null
   prijsVanafSrd: number | null
   aanmeldingen: number
+  // Naam van de organiserende organisatie; staat op de kaarten en in de
+  // weekendlijst op de homepage.
+  organisator: string
 }
 
 // Aggregatie van ticket_types per event: laagste SRD-prijs ("vanaf") en totaal
 // verkocht (aanmeldingen). In JS omdat de lijst klein blijft (< 200 events).
-function aggregateTypes(rows: Array<{ event_id: string; prijs_srd: string; aantal_verkocht: string }>) {
-  const perEvent = new Map<string, { minSrd: number | null; verkocht: number }>()
+function aggregateTypes(
+  rows: Array<{ event_id: string; prijs_srd: string; aantal_verkocht: string }>,
+) {
+  const perEvent = new Map<
+    string,
+    { minSrd: number | null; verkocht: number }
+  >()
   for (const r of rows) {
     const huidig = perEvent.get(r.event_id) ?? { minSrd: null, verkocht: 0 }
     const srd = Number(r.prijs_srd)
@@ -47,42 +55,89 @@ function aggregateTypes(rows: Array<{ event_id: string; prijs_srd: string; aanta
   return perEvent
 }
 
-export const listPublicEvents = createServerFn({ method: 'GET' }).handler(async (): Promise<Array<PublicEventCard>> => {
-  const eventRows = await db
-    .select()
-    .from(events)
-    .where(eq(events.status, PUBLIEK))
-    .orderBy(asc(events.datum_start))
+export const listPublicEvents = createServerFn({ method: 'GET' }).handler(
+  async (): Promise<Array<PublicEventCard>> => {
+    const eventRows = await db
+      .select({
+        id: events.id,
+        naam: events.naam,
+        datum_start: events.datum_start,
+        locatie: events.locatie,
+        categorie: events.categorie,
+        cover_afbeelding_url: events.cover_afbeelding_url,
+        organisator: organizations.naam,
+      })
+      .from(events)
+      .innerJoin(organizations, eq(events.organization_id, organizations.id))
+      .where(eq(events.status, PUBLIEK))
+      .orderBy(asc(events.datum_start))
 
-  const ids = eventRows.map((e) => e.id)
-  const typeRows = ids.length
-    ? await db
-        .select({
-          event_id: ticketTypes.event_id,
-          prijs_srd: ticketTypes.prijs_srd,
-          aantal_verkocht: ticketTypes.aantal_verkocht,
-        })
-        .from(ticketTypes)
-        .where(inArray(ticketTypes.event_id, ids))
-    : []
+    const ids = eventRows.map((e) => e.id)
+    const typeRows = ids.length
+      ? await db
+          .select({
+            event_id: ticketTypes.event_id,
+            prijs_srd: ticketTypes.prijs_srd,
+            aantal_verkocht: ticketTypes.aantal_verkocht,
+          })
+          .from(ticketTypes)
+          .where(inArray(ticketTypes.event_id, ids))
+      : []
 
-  const agg = aggregateTypes(typeRows)
+    const agg = aggregateTypes(typeRows)
 
-  return eventRows.map((e) => {
-    const a = agg.get(e.id)
-    return {
-      id: e.id,
-      categorie: e.categorie,
-      cover: e.cover_afbeelding_url,
-      titel: e.naam,
-      dateLine: formatDateLine(e.datum_start),
-      datumStart: e.datum_start.toISOString(),
-      locatie: e.locatie,
-      prijsVanafSrd: a?.minSrd ?? null,
-      aanmeldingen: a?.verkocht ?? 0,
-    }
-  })
-})
+    return eventRows.map((e) => {
+      const a = agg.get(e.id)
+      return {
+        id: e.id,
+        categorie: e.categorie,
+        cover: e.cover_afbeelding_url,
+        titel: e.naam,
+        dateLine: formatDateLine(e.datum_start),
+        datumStart: e.datum_start.toISOString(),
+        locatie: e.locatie,
+        prijsVanafSrd: a?.minSrd ?? null,
+        aanmeldingen: a?.verkocht ?? 0,
+        organisator: e.organisator,
+      }
+    })
+  },
+)
+
+export type HomepageStats = {
+  events: number
+  organisatoren: number
+  tickets: number
+}
+
+/**
+ * De drie cijfers die de homepage toont. Bewust alleen tellingen die de database
+ * kan onderbouwen — het ontwerp stond vol met verzonnen getallen ("147 live",
+ * "4,8 uit 2.140 beoordelingen") en die staan er niet in. Waar geen cijfer is,
+ * staat op de pagina tekst zonder getal.
+ *
+ * Zelfde uitzondering op harde regel 3 als hierboven: geen sessie, dus filteren
+ * op `status = 'actief'` in plaats van op organization_id.
+ */
+export const getHomepageStats = createServerFn({ method: 'GET' }).handler(
+  async (): Promise<HomepageStats> => {
+    const rijen = await db
+      .select({
+        eventId: events.id,
+        organizationId: events.organization_id,
+        verkocht: ticketTypes.aantal_verkocht,
+      })
+      .from(events)
+      .leftJoin(ticketTypes, eq(ticketTypes.event_id, events.id))
+      .where(eq(events.status, PUBLIEK))
+
+    const eventIds = new Set(rijen.map((r) => r.eventId))
+    const orgIds = new Set(rijen.map((r) => r.organizationId))
+    const tickets = rijen.reduce((som, r) => som + Number(r.verkocht ?? 0), 0)
+
+    return { events: eventIds.size, organisatoren: orgIds.size, tickets }
+  },
+)
 
 export type PublicEventDetail = {
   id: string
@@ -96,8 +151,19 @@ export type PublicEventDetail = {
   organisator: string
   prijsVanafSrd: number | null
   paragrafen: Array<string>
-  sprekers: Array<{ id: string; naam: string; rol: string | null; avatarUrl: string | null }>
-  agenda: Array<{ id: string; tijd: string; titel: string; subtitel: string | null; beschrijving: string | null }>
+  sprekers: Array<{
+    id: string
+    naam: string
+    rol: string | null
+    avatarUrl: string | null
+  }>
+  agenda: Array<{
+    id: string
+    tijd: string
+    titel: string
+    subtitel: string | null
+    beschrijving: string | null
+  }>
   faqs: Array<{ id: string; vraag: string; antwoord: string | null }>
   tickets: Array<{
     id: string
@@ -133,9 +199,21 @@ export const getPublicEvent = createServerFn({ method: 'GET' })
 
     const [typeRows, sprekerRows, agendaRows, faqRows] = await Promise.all([
       db.select().from(ticketTypes).where(eq(ticketTypes.event_id, eventId)),
-      db.select().from(eventSprekers).where(eq(eventSprekers.event_id, eventId)).orderBy(asc(eventSprekers.volgorde)),
-      db.select().from(eventAgenda).where(eq(eventAgenda.event_id, eventId)).orderBy(asc(eventAgenda.volgorde)),
-      db.select().from(eventFaq).where(eq(eventFaq.event_id, eventId)).orderBy(asc(eventFaq.volgorde)),
+      db
+        .select()
+        .from(eventSprekers)
+        .where(eq(eventSprekers.event_id, eventId))
+        .orderBy(asc(eventSprekers.volgorde)),
+      db
+        .select()
+        .from(eventAgenda)
+        .where(eq(eventAgenda.event_id, eventId))
+        .orderBy(asc(eventAgenda.volgorde)),
+      db
+        .select()
+        .from(eventFaq)
+        .where(eq(eventFaq.event_id, eventId))
+        .orderBy(asc(eventFaq.volgorde)),
     ])
 
     const prijzenSrd = typeRows.map((t) => Number(t.prijs_srd))
@@ -156,7 +234,12 @@ export const getPublicEvent = createServerFn({ method: 'GET' })
         .split(/\n{2,}/)
         .map((p) => p.trim())
         .filter(Boolean),
-      sprekers: sprekerRows.map((s) => ({ id: s.id, naam: s.naam, rol: s.rol, avatarUrl: s.avatar_url })),
+      sprekers: sprekerRows.map((s) => ({
+        id: s.id,
+        naam: s.naam,
+        rol: s.rol,
+        avatarUrl: s.avatar_url,
+      })),
       agenda: agendaRows.map((a) => ({
         id: a.id,
         tijd: a.tijd,
@@ -164,7 +247,11 @@ export const getPublicEvent = createServerFn({ method: 'GET' })
         subtitel: a.subtitel,
         beschrijving: a.beschrijving,
       })),
-      faqs: faqRows.map((f) => ({ id: f.id, vraag: f.vraag, antwoord: f.antwoord })),
+      faqs: faqRows.map((f) => ({
+        id: f.id,
+        vraag: f.vraag,
+        antwoord: f.antwoord,
+      })),
       tickets: typeRows.map((t) => ({
         id: t.id,
         naam: t.naam,
