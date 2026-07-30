@@ -116,7 +116,9 @@ domeinverificatie af, maar alleen naar je eigen account-adres.
 ## Uitrollen (elke keer)
 
 Alles vanuit de productiemap. Ontwikkelen gebeurt hier niet — de code komt via
-`origin/main` uit de dev-map of van de laptop.
+`origin/main` uit de dev-map of van de laptop. De route ernaartoe (bug vinden,
+in dev bouwen, testen) staat in `docs/WERKWIJZE.md`; hieronder staat alleen de
+uitrol zelf.
 
 ```bash
 cd /home/amresh/ticketsysteem

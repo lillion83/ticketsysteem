@@ -72,6 +72,11 @@ staat in sectie 10). Per sessie doen we één fase.
 - Werk niet vooruit op een volgende fase, ook niet "alvast even".
 - Bij een ontwerpkeuze die het plan niet dekt: vraag het, ga niet gokken.
 
+Voor losse bugs en wijzigingen buiten een fase geldt de route in
+`docs/WERKWIJZE.md`: bouwen en testen in de dev-map, committen en pushen, en
+**pas deployen als Amresh daar expliciet ja op zegt**. Een push zet niets live;
+zeg dat ook als hij ervan uitgaat dat het al draait.
+
 ## Omgeving
 
 **Namen.** "InterServer" is de online server (`162.35.176.40`, Ubuntu 24.04) die

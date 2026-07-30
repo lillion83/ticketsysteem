@@ -10,6 +10,7 @@ die opzet start hij niet.
 
 | Ik wil… | Lees dit |
 | --- | --- |
+| **een bug oplossen of iets wijzigen** | **`docs/WERKWIJZE.md`** |
 | lokaal opzetten op Windows | `docs/SETUP-WINDOWS.md` |
 | met de test-database werken | `docs/TESTDB.md` |
 | live zetten | `infra/DEPLOY.md` |

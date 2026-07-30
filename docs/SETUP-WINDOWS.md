@@ -380,5 +380,9 @@ ssh -L 3300:localhost:3300 -L 3200:localhost:3200 amresh@162.35.176.40
 
 Laat dat venster open staan en open dan `http://localhost:3300` in je browser hier.
 
-Zie `docs/TESTDB.md` voor het werken met de test-database, en `docs/PLAN.md`
+**De route van bug naar live** — wat je doet als je iets vindt of wil wijzigen —
+staat in `docs/WERKWIJZE.md`. Lees die één keer door: het belangrijkste verschil
+met vroeger is dat een `git push` niets live zet.
+
+Zie verder `docs/TESTDB.md` voor het werken met de test-database, en `docs/PLAN.md`
 voor de scope en het datamodel.
