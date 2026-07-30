@@ -26,6 +26,7 @@
     "db:seed:test": "tsx --env-file=.env.test src/db/seed.ts",
     "db:seed-admin:test": "tsx --env-file=.env.test src/db/seed-admin.ts",
     "db:seed-platform-admin:test": "tsx --env-file=.env.test src/db/seed-platform-admin.ts",
+    "db:seed-testgebruikers:test": "tsx --env-file=.env.test src/db/seed-testgebruikers.ts",
     "db:omgeving:test": "tsx --env-file=.env.test src/db/omgeving.ts",
     "db:migrate:prod": "drizzle-kit migrate --config=drizzle.config.prod.ts",
     "db:omgeving:prod": "tsx --env-file=.env.production src/db/omgeving.ts"
