@@ -35,9 +35,13 @@ const categoryColors: Record<string, [string, string]> = {
   'Food & Drink': ['#FFFBEB', '#FEF3C7'],
 }
 
+// `cover` is bewust verplicht en niet optioneel. Hem vergeten levert een kaart met
+// de categorie-placeholder op, en dat ziet er niet uit als een fout maar als een
+// event zonder flyer — zo verdwenen de covers ongemerkt van de homepage. Heeft een
+// event echt geen afbeelding, geef dan expliciet `null` mee.
 export function coverStyle(
   categorie: string | null,
-  cover?: string | null,
+  cover: string | null,
 ): CSSProperties {
   if (cover)
     return {
@@ -78,7 +82,8 @@ export function EventBanner({
   children,
 }: {
   categorie: string | null
-  cover?: string | null
+  // Verplicht, om dezelfde reden als bij `coverStyle` hierboven.
+  cover: string | null
   className?: string
   children?: ReactNode
 }) {

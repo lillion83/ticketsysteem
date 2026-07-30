@@ -197,7 +197,7 @@ function Home() {
                   params={{ eventId: ev.id }}
                   className="block overflow-hidden rounded-[16px] border border-[#E5E7EB] bg-white text-[#0F172A] shadow-[0_1px_3px_rgba(15,23,42,0.05)] transition hover:shadow-md"
                 >
-                  <div className="relative h-[170px]" style={coverStyle(ev.categorie)}>
+                  <div className="relative h-[170px]" style={coverStyle(ev.categorie, ev.cover)}>
                     {ev.categorie && (
                       <div className="absolute left-3 top-3 rounded-full bg-[#DBEAFE] px-3 py-1 text-[12px] font-bold text-[#2563EB]">
                         {ev.categorie}
@@ -242,7 +242,7 @@ function Home() {
                 key={ev.id}
                 className="flex flex-col gap-5 rounded-[16px] border border-[#E5E7EB] p-3.5 sm:flex-row sm:items-center"
               >
-                <div className="h-[88px] w-full flex-none rounded-[12px] sm:w-[120px]" style={coverStyle(ev.categorie)} />
+                <div className="h-[88px] w-full flex-none rounded-[12px] sm:w-[120px]" style={coverStyle(ev.categorie, ev.cover)} />
                 <div className="flex-1">
                   <div className="mb-1.5 flex items-center gap-2.5 text-[12px] text-[#64748B]">
                     {ev.categorie && (
