@@ -17,7 +17,10 @@ import { nitro } from 'nitro/vite'
 // blijft de bescherming staan (`allowedHosts: true` zou haar juist uitschakelen).
 function toegestaneHosts(): Array<string> {
   const hosts = new Set<string>()
-  for (const url of [process.env.PUBLIC_BASE_URL, process.env.BETTER_AUTH_URL]) {
+  for (const url of [
+    process.env.PUBLIC_BASE_URL,
+    process.env.BETTER_AUTH_URL,
+  ]) {
     if (!url) continue
     try {
       hosts.add(new URL(url).hostname)
