@@ -1,6 +1,27 @@
 
 @import "tailwindcss";
 
+/* Zachte "adem" onder de knop "Bekijk volledige flyer", die midden in de banner
+   staat. Een langzame schaal met een uitdijende ring valt op zonder te knipperen;
+   animate-pulse laat de tekst juist wegvallen en leest als "aan het laden".
+   Keyframes horen in @theme, dan maakt Tailwind de utility `animate-flyer-cta`.
+   In de knop staat `motion-reduce:animate-none` voor wie beweging uit heeft. */
+@theme {
+  --animate-flyer-cta: flyer-cta 2.6s ease-in-out infinite;
+
+  @keyframes flyer-cta {
+    0%,
+    100% {
+      transform: scale(1);
+      box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.65);
+    }
+    50% {
+      transform: scale(1.045);
+      box-shadow: 0 0 0 9px rgba(37, 99, 235, 0);
+    }
+  }
+}
+
 * {
   box-sizing: border-box;
 }

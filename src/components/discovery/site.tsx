@@ -87,23 +87,33 @@ export function EventBanner({
   return (
     <>
       <div className={className} style={coverStyle(categorie, cover)}>
+        {/* De flyer gedimd, zodat de CTA en de titel eroverheen knallen. Alleen
+            bij een echte cover: de categorie-placeholder is een lichte pastel
+            streep en die wordt hier alleen maar vies van. Staat vóór `children`,
+            dus de titel en de datum liggen erbovenop. */}
+        {cover && <span aria-hidden className="absolute inset-0 bg-black/45" />}
         {children}
         {/* Organisatoren zetten prijzen, line-up en tijden ín de flyer, en een
             crop kan daar iets van afsnijden. Dus altijd een uitweg naar de hele
             flyer. Een <button> is vanzelf met het toetsenbord te bedienen; de
-            knop ligt over de hele banner. */}
+            knop ligt over de hele banner, met de CTA in het midden — daar valt
+            hij op en laat hij de titel linksonder vrij.
+
+            Geen eigen verlooplaag hier: deze knop staat ná `children` in de DOM
+            en zou er dus bovenop liggen, over de titel en de datum heen. Toen de
+            CTA nog rechtsonder stond maakte dat verloop hem leesbaar; in het
+            midden doet het niets meer behalve de titel verduisteren. De pil
+            leunt op zijn eigen achtergrond en `backdrop-blur`. */}
         {cover && (
           <button
             type="button"
             onClick={() => setLightboxOpen(true)}
             aria-label="Bekijk volledige flyer"
-            className="absolute inset-0 flex cursor-pointer items-end justify-end"
+            className="group absolute inset-0 flex cursor-pointer items-center justify-center"
           >
-            <span
-              aria-hidden
-              className="absolute inset-x-0 bottom-0 h-1/3 bg-[linear-gradient(transparent,rgba(15,23,42,0.7))]"
-            />
-            <span className="relative m-4 inline-flex items-center gap-2 rounded-full bg-black/45 px-3.5 py-2 text-[13px] font-bold text-white">
+            {/* Zelfde vorm en kleur als de primaire knoppen in de nav: vol
+                dekkend, dus knalhelder op de gedimde flyer. */}
+            <span className="inline-flex animate-flyer-cta items-center gap-2 rounded-full bg-[#2563EB] px-5 py-2.5 text-[14px] font-bold text-white transition-colors group-hover:bg-[#1D4ED8] motion-reduce:animate-none">
               <ExpandIcon />
               Bekijk volledige flyer
             </span>
