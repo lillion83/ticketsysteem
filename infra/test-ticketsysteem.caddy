@@ -15,6 +15,11 @@
 # /home/amresh/dev/ticketsysteem. Staat hij niet aan, dan geeft Caddy een 502.
 # Dat is bewust — een testomgeving hoeft niet 24/7 te draaien, en InterServer heeft
 # maar 1,9 GB RAM.
+#
+# Krijg je een 403 met "Blocked request. This host is not allowed": dat is Vite,
+# niet Caddy. De dev-server weigert onbekende Host-headers (bescherming tegen
+# DNS-rebinding). `vite.config.ts` leidt de toegestane host af uit PUBLIC_BASE_URL,
+# dus die moet in `.env.test` op dit adres staan.
 
 test-tickets.mijnonline.shop {
 	encode zstd gzip

@@ -287,6 +287,25 @@ caddy reload --config /etc/caddy/Caddyfile
 fout in dit bestand haalt ook **productie** onderuit. Root is niet nodig: Caddy
 praat via zijn beheer-API op localhost:2019.
 
+> **Gebruik nooit `caddy stop`, en start geen tweede Caddy.** Beide commando's
+> praten met de beheer-API op `localhost:2019`, en dat is die van de draaiende
+> productie-Caddy — ongeacht welke `--config` je meegeeft. Op 2026-07-30 is
+> `tickets.mijnonline.shop` hierdoor offline gegaan: een los Caddy-instantietje was
+> gestart om een wachtwoordhash te testen, en het bijbehorende `caddy stop` sloot
+> de systemd-service af. Herstellen vereist root (`sudo systemctl start caddy`),
+> want poort 80 en 443 zijn niet te binden zonder.
+>
+> Wil je een siteblok of een hash uitproberen, doe dan één van deze twee:
+>
+> ```bash
+> caddy validate --config <bestand> --adapter caddyfile   # alleen syntaxis
+> caddy run --config <bestand> --adapter caddyfile --adminaddr localhost:2029
+> ```
+>
+> Die tweede draait op de voorgrond met een eigen beheerpoort, dus `Ctrl+C` stopt
+> alleen jouw instantie. Gebruik in zo'n testblok een hoge poort (`:8899`), nooit
+> 80 of 443.
+
 ### 3. Gebruiken
 
 De test-app draait niet onder PM2. Start hem in de dev-map:
