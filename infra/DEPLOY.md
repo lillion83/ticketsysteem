@@ -135,7 +135,7 @@ git pull && npm ci
 ### Back-up, vóór de migratie
 
 Geen back-up = niet deployen. Drizzle heeft geen down-migraties, dus deze dump
-*is* het rollbackmechanisme.
+_is_ het rollbackmechanisme.
 
 ```bash
 mkdir -p /home/amresh/backups
@@ -252,6 +252,55 @@ pm2 logs ticketsysteem --lines 50
 ```bash
 sudo journalctl -u caddy -n 50
 ```
+
+## Losse ingreep: het e-mailadres van een account wijzigen
+
+Niet iets voor elke deploy — een aparte handeling die je erbij kunt doen als je
+toch op de server bent. Het staat hier omdat dit de enige plek is waar een script
+bewust op productie schrijft.
+
+**Openstaand geval (2026-07-30):** het platform-adminaccount op productie heet
+`amresh@example.com`. Dat domein bestaat niet, dus de e-mailcode-login kan daar
+nooit een code naartoe sturen: raak je het wachtwoord kwijt, dan is er geen weg
+terug. Corrigeren naar een echt adres gaat zo.
+
+Eerst een back-up, in hetzelfde formaat als bij een deploy:
+
+```bash
+cd /home/amresh/ticketsysteem && set -a && . ./.env.production && set +a && pg_dump "$DATABASE_URL" -Fc -f /home/amresh/backups/voor-emailwijziging-$(date +%F-%H%M).dump
+```
+
+Verifiëren dat er echt iets in zit — geen inhoudsopgave is geen back-up:
+
+```bash
+pg_restore -l /home/amresh/backups/voor-emailwijziging-*.dump | head
+```
+
+Dan de wijziging zelf:
+
+```bash
+cd /home/amresh/ticketsysteem && ALLOW_PRODUCTION_WRITE=ik-weet-het-zeker npm run db:wijzig-email:prod -- --van amresh@example.com --naar amresh@kalenda.sr
+```
+
+`ALLOW_PRODUCTION_WRITE` is nodig omdat `weigerOpProductie()` elk datawijzigend
+script op productie blokkeert. Die lange waarde typ je niet per ongeluk, en dat is
+precies de bedoeling. Zet hem **op de regel zelf**, nooit in `.env.production`:
+daar blijft hij staan en dan is de vangrail weg voor elk volgend script.
+
+**Het wachtwoord verandert niet mee.** Better Auth bewaart de inloggegevens in
+`account`, gekoppeld op user-id en niet op e-mailadres; het adres staat alleen in
+`user.email`. Sessies blijven ook leven — een adreswijziging is geen
+wachtwoordwijziging. Log daarna in met het nieuwe adres en je bestaande
+wachtwoord.
+
+Controleren:
+
+```bash
+cd /home/amresh/ticketsysteem && psql "$(grep '^DATABASE_URL' .env.production | cut -d= -f2-)" -c 'select email, rol from "user" order by rol;'
+```
+
+Terugdraaien is hetzelfde commando met `--van` en `--naar` omgewisseld; de
+`pg_dump` heb je alleen nodig als er iets onverwachts gebeurt.
 
 ## Test-omgeving op https (voor de scanner)
 
@@ -379,16 +428,16 @@ Daarna volgens het rollbackpad hierboven terugzetten — inclusief de
 Alles staat op InterServer, maar in gescheiden mappen met eigen databases. Dit was
 tot 30 juli 2026 níet zo: dev en productie deelden één map én één database.
 
-| | productie | dev | test |
-|---|---|---|---|
-| Map | `/home/amresh/ticketsysteem` | `/home/amresh/dev/ticketsysteem` | idem dev-map |
-| Database | `ticketsysteem` | `ticketsysteem_dev` | `ticketsysteem_test` |
-| Poort | 3100 (PM2, via Caddy) | 3300 | 3200 |
-| Env-bestand | `.env.production` | `.env` | `.env.test` |
-| `APP_ENV` | `production` | `development` | `test` |
-| Uploads | `/home/amresh/ticketsysteem-data/uploads` | `<dev-map>/uploads` | `<dev-map>/uploads-test` |
-| Mail | echte Resend-key | leeg → console | leeg → console |
-| `TICKET_SECRET` | het echte | eigen, ánder geheim | eigen, ánder geheim |
+|                 | productie                                 | dev                              | test                     |
+| --------------- | ----------------------------------------- | -------------------------------- | ------------------------ |
+| Map             | `/home/amresh/ticketsysteem`              | `/home/amresh/dev/ticketsysteem` | idem dev-map             |
+| Database        | `ticketsysteem`                           | `ticketsysteem_dev`              | `ticketsysteem_test`     |
+| Poort           | 3100 (PM2, via Caddy)                     | 3300                             | 3200                     |
+| Env-bestand     | `.env.production`                         | `.env`                           | `.env.test`              |
+| `APP_ENV`       | `production`                              | `development`                    | `test`                   |
+| Uploads         | `/home/amresh/ticketsysteem-data/uploads` | `<dev-map>/uploads`              | `<dev-map>/uploads-test` |
+| Mail            | echte Resend-key                          | leeg → console                   | leeg → console           |
+| `TICKET_SECRET` | het echte                                 | eigen, ánder geheim              | eigen, ánder geheim      |
 
 Dev en test hebben bewust een ander `TICKET_SECRET`: met hetzelfde geheim zou een
 in dev aangemaakt ticket aan de echte deur groen scannen.
