@@ -147,6 +147,12 @@ pg_restore -l /home/amresh/backups/ticketsysteem-$STAMP.dump | head
 Die laatste regel is de verificatie: **geen inhoudsopgave = geen back-up**, dan
 stop je hier. `-Fc` (custom format) omdat je daarmee selectief kunt terugzetten.
 
+Sneller alternatief dat hetzelfde doet plus een off-site kopie:
+
+```bash
+/home/amresh/backup-scripts/app-backup.sh /home/amresh/backup-scripts/ticketsysteem.env
+```
+
 ### Migreren en herstarten
 
 ```bash
@@ -244,6 +250,55 @@ pm2 logs ticketsysteem --lines 50
 ```bash
 sudo journalctl -u caddy -n 50
 ```
+
+## Nachtelijke back-up naar Cloudflare R2
+
+Elke nacht **03:30** loopt er een cron die de productiedatabase dumpt, de
+uploadmap intart, en beide naar Cloudflare R2 uploadt. Lokaal blijven 3 dagen
+staan, off-site 30 dagen.
+
+```
+30 3 * * * /home/amresh/backup-scripts/app-backup.sh \
+    /home/amresh/backup-scripts/ticketsysteem.env \
+    >> /home/amresh/backups/backup.log 2>&1
+```
+
+`app-backup.sh` is generiek en wordt via een configbestand per app ingesteld;
+webwinkri draait om 03:00 met zijn eigen config (bewust een half uur eerder —
+InterServer heeft 1,9 GB RAM, dus geen twee dumps en uploads tegelijk). Geen
+secrets in de config: de `DATABASE_URL` komt uit `.env.production`, de
+R2-sleutels uit `~/.config/rclone/rclone.conf`.
+
+**Elke app heeft zijn eigen prefix in de bucket** (`webwinkri-backups/ticketsysteem`
+en `webwinkri-backups/webwinkri`). Dat is geen cosmetiek: de opruimactie
+(`rclone delete --min-age 30d`) is recursief, dus zonder eigen prefix zou de
+retentie van de ene app de dumps van de andere weggooien.
+
+### Controleren dat het echt werkt
+
+```bash
+tail -20 /home/amresh/backups/backup.log
+rclone ls r2:webwinkri-backups/ticketsysteem/
+```
+
+Het script logt `geüpload en teruggezien` — het kijkt na de upload zelf terug in de
+bucket. Die verificatie zit erin omdat rclone bij deze R2-token na een upload een
+HEAD-verzoek doet dat met `501 Not Implemented` wordt afgewezen, waarna rclone het
+opnieuw probeert en `Attempt 2/3 succeeded` meldt. Dat leest als een fout terwijl
+het goed ging, en het omgekeerde kan ook: een `succeeded` zonder dat er iets
+aankwam. Vandaar `--s3-no-head` plus een eigen `rclone ls`-controle. **Staat er
+`WAARSCHUWING` in het log, dan is er géén off-site kopie van die nacht.**
+
+### Terugzetten uit R2
+
+```bash
+rclone lsf r2:webwinkri-backups/ticketsysteem/
+rclone copy --s3-no-head r2:webwinkri-backups/ticketsysteem/<bestand> /tmp/herstel/
+pg_restore -l /tmp/herstel/<bestand> | head        # leesbaar?
+```
+
+Daarna volgens het rollbackpad hierboven terugzetten — inclusief de
+`COMMENT ON DATABASE`-regel, want die zit niet in de dump.
 
 ## De drie omgevingen
 
