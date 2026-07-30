@@ -251,6 +251,59 @@ pm2 logs ticketsysteem --lines 50
 sudo journalctl -u caddy -n 50
 ```
 
+## Test-omgeving op https (voor de scanner)
+
+De camera-API van de scanner werkt alleen in een secure context. Over een
+ssh-tunnel op `http://localhost:3200` krijg je dus geen camera, en kun je de
+deurscanner niet op een echte telefoon testen. Daarom heeft de test-omgeving een
+eigen https-adres: `test-tickets.mijnonline.shop` → Caddy → poort 3200.
+
+### 1. DNS bij Porkbun
+
+| Type | Host           | Waarde          | TTL |
+| ---- | -------------- | --------------- | --- |
+| A    | `test-tickets` | `162.35.176.40` | 600 |
+
+**Let op:** er staat een wildcard `*.mijnonline.shop` die naar `207.207.210.107`
+wijst. Zonder dit specifieke record komt `test-tickets` daar terecht, en dan
+mislukt de certificaatvalidatie. Controleer eerst:
+
+```bash
+getent hosts test-tickets.mijnonline.shop
+```
+
+Pas doorgaan als daar `162.35.176.40` staat. Installeer het siteblok **niet**
+eerder: elke mislukte poging telt mee voor de limieten van Let's Encrypt.
+
+### 2. Siteblok plaatsen
+
+```bash
+cp /home/amresh/dev/ticketsysteem/infra/test-ticketsysteem.caddy /etc/caddy/sites/
+caddy validate --config /etc/caddy/Caddyfile
+caddy reload --config /etc/caddy/Caddyfile
+```
+
+`validate` vóór `reload`, altijd. Alle siteblokken worden samen ingelezen, dus een
+fout in dit bestand haalt ook **productie** onderuit. Root is niet nodig: Caddy
+praat via zijn beheer-API op localhost:2019.
+
+### 3. Gebruiken
+
+De test-app draait niet onder PM2. Start hem in de dev-map:
+
+```bash
+npm run dev:test
+```
+
+Daarna is <https://test-tickets.mijnonline.shop> bereikbaar, met een
+wachtwoordvenster (gebruiker `amresh`). Staat de server niet aan, dan geeft Caddy
+een 502 — dat is bewust: een testomgeving hoeft niet 24/7 te draaien, en
+InterServer heeft maar 1,9 GB RAM.
+
+`.env.test` heeft `BETTER_AUTH_URL` en `PUBLIC_BASE_URL` op dit adres staan. Dat
+moet ook: met `localhost` erin weigert inloggen met `INVALID_ORIGIN` en wijzen de
+ticketlinks en de scanner-koppel-QR naar een adres dat de telefoon niet kan openen.
+
 ## Nachtelijke back-up naar Cloudflare R2
 
 Elke nacht **03:30** loopt er een cron die de productiedatabase dumpt, de

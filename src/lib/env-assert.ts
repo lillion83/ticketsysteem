@@ -17,6 +17,22 @@ function fout(regels: Array<string>): never {
   throw new Error(['Omgevingsfout:', ...regels].join('\n'))
 }
 
+/**
+ * Is dit exact de productiehost? Bewust op hostnaam vergelijken en niet met
+ * `includes()`: `test-tickets.mijnonline.shop` bevat de productiehost als
+ * tekstfragment, maar is een andere host. Met een substring-check weigerde de
+ * testomgeving te starten zodra die zijn eigen https-adres kreeg.
+ */
+function isProductieHost(url: string | undefined): boolean {
+  if (!url) return false
+  try {
+    return new URL(url).hostname === PRODUCTIE_HOST
+  } catch {
+    // Onleesbare URL is een ander probleem; hier niet over vallen.
+    return false
+  }
+}
+
 const appEnv = process.env.APP_ENV
 
 if (!appEnv) {
@@ -48,13 +64,13 @@ if (appEnv !== 'production') {
   }
 
   const urls = [process.env.PUBLIC_BASE_URL, process.env.BETTER_AUTH_URL]
-  if (urls.some((u) => u?.includes(PRODUCTIE_HOST))) {
+  if (urls.some(isProductieHost)) {
     fout([
       `  APP_ENV=${appEnv}, maar PUBLIC_BASE_URL of BETTER_AUTH_URL wijst naar ${PRODUCTIE_HOST}.`,
       '',
       '  Dan komen ticketlinks en scanner-koppel-QR’s op productie uit, terwijl je',
       '  in een testomgeving werkt. Zet beide op je eigen adres, bijvoorbeeld',
-      '  http://localhost:3300.',
+      '  http://localhost:3300 of https://test-tickets.mijnonline.shop.',
     ])
   }
 } else {

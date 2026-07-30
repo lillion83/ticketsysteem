@@ -1,6 +1,6 @@
 # Caddy-siteblok voor het ticketsysteem.
 #
-# Plaatsing op de VPS: /etc/caddy/sites/ticketsysteem.caddy
+# Plaatsing op InterServer: /etc/caddy/sites/ticketsysteem.caddy
 # De hoofd-Caddyfile (/etc/caddy/Caddyfile) leest die map in met:
 #     import /etc/caddy/sites/*.caddy
 #

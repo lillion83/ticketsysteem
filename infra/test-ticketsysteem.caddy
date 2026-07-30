@@ -1,0 +1,37 @@
+# Caddy-siteblok voor de TEST-omgeving.
+#
+# Plaatsing op InterServer: /etc/caddy/sites/test-ticketsysteem.caddy
+# De hoofd-Caddyfile leest die map in met: import /etc/caddy/sites/*.caddy
+#
+# VEREIST: DNS-A-record  test-tickets.mijnonline.shop -> 162.35.176.40
+#
+# WAAROM dit bestaat: de camera-API van de scanner werkt alleen in een secure
+# context. Over een ssh-tunnel op http://localhost:3200 krijg je dus geen camera,
+# en dan kun je de deurscanner niet op een echte telefoon testen. Vóór dit blok was
+# productie het enige https-adres, en daarom stond er in de testchecklist dat je
+# een TEST-event op tickets.mijnonline.shop moest aanmaken. Dat hoeft nu niet meer.
+#
+# De test-app draait NIET onder PM2: start hem met `npm run dev:test` in
+# /home/amresh/dev/ticketsysteem. Staat hij niet aan, dan geeft Caddy een 502.
+# Dat is bewust — een testomgeving hoeft niet 24/7 te draaien, en InterServer heeft
+# maar 1,9 GB RAM.
+
+test-tickets.mijnonline.shop {
+	encode zstd gzip
+
+	# Wachtwoordbeveiliging is hier GEEN luxe: zonder dit staat een omgeving met
+	# testdata publiek op internet, en indexeert Google hem. De hash hoort bij een
+	# wachtwoord dat buiten Git wordt bewaard; hash opnieuw maken kan met
+	#     caddy hash-password --plaintext '<nieuw wachtwoord>'
+	#
+	# `basicauth` en niet `basic_auth`: deze server draait Caddy 2.6.2, en die
+	# nieuwere spelling bestaat pas vanaf 2.8. Met `basic_auth` weigert Caddy de
+	# hele config met "unrecognized directive" — en dan valt ook productie stil,
+	# want alle siteblokken worden samen ingelezen.
+	basicauth {
+		amresh $2a$14$qiEfHAh/al5eujyNBrUTs.etbZ9NrCNJxQHUi0PksQN7cc1e.VEQS
+	}
+
+	# Poort 3200 staat niet open in de firewall; al het verkeer loopt via Caddy.
+	reverse_proxy localhost:3200
+}
