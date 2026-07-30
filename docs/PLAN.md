@@ -45,7 +45,7 @@ Zelfde fundering als Webwinkri, om herbruik te maximaliseren:
 - **Framework:** TanStack Start
 - **Database:** PostgreSQL + Drizzle ORM
 - **Auth:** Better Auth (organization plugin, ook al is er één org)
-- **Hosting:** VPS (InterServer), Caddy + PM2
+- **Hosting:** InterServer, Caddy + PM2
 - **Mail:** Resend (transactioneel, geen campagne)
 - **Scanner:** PWA in dezelfde app, aparte route
 
@@ -169,7 +169,7 @@ scanner_sessions
 ### Fase A — Fundering (halve dag)
 Schema in Drizzle, migraties, seed met één organisatie en één testevent.
 
-*Checkpoint:* migratie draait schoon op de VPS, testdata zichtbaar via `psql`.
+*Checkpoint:* migratie draait schoon op InterServer, testdata zichtbaar via `psql`.
 
 ### Fase B — Ticketuitgifte (1,5 dag)
 Admin: event aanmaken, tickettypes instellen, ticket uitgeven (naam, telefoon, mail, type → knop "verkocht"). Verkooplijst met zoeken. Ticket intrekken. HMAC-generatie.

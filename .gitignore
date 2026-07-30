@@ -5,6 +5,9 @@ dist-ssr
 *.local
 .env
 .env.test
+# Let op: `*.local` dekt .env.production NIET. Zonder deze regel commit je de
+# echte mailkey en het database-wachtwoord van productie.
+.env.production
 .nitro
 .tanstack
 .wrangler
@@ -13,5 +16,7 @@ dist-ssr
 __unconfig*
 todos.json
 
-# Geüploade afbeeldingen (cover-afbeeldingen). Staan op de schijf van de server.
+# Geüploade afbeeldingen (cover-afbeeldingen). Staan op de schijf van de server;
+# in productie buiten de repo, via UPLOAD_DIR.
 uploads
+uploads-test

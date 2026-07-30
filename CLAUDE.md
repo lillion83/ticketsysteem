@@ -16,8 +16,8 @@ datamodel — dit bestand bevat alleen de regels, niet de context.**
 - PostgreSQL + Drizzle ORM
 - Better Auth (met organization plugin)
 - Tailwind CSS 4
-- Brevo voor transactionele mail
-- Deploy: VPS met Caddy + PM2
+- Resend voor transactionele mail
+- Deploy: InterServer met Caddy + PM2
 
 ## Harde regels — hier nooit van afwijken zonder te overleggen
 
@@ -57,11 +57,14 @@ datamodel — dit bestand bevat alleen de regels, niet de context.**
 - **UI-teksten:** Nederlands. Bedragen in SRD.
 - **Migraties:** altijd via `drizzle-kit generate`, nooit handmatig SQL in de db.
 - Geen nieuwe dependencies zonder het even te melden en te motiveren.
+- **Elk script dat data wijzigt of verwijdert roept `weigerOpProductie()` aan**
+  (`src/db/guard.ts`), als eerste regel. Zonder die regel erodeert de vangrail bij
+  het eerste volgende script.
 
 ## Werkwijze
 
-Ik bouw in fases (A t/m F, zie `docs/PLAN.md` sectie 5). Per sessie doen we
-één fase.
+Ik bouw in fases (A t/m F in `docs/PLAN.md` sectie 5; de tweede reeks G t/m K
+staat in sectie 10). Per sessie doen we één fase.
 
 - Begin een fase met een kort plan van aanpak vóór je code schrijft.
 - Aan het eind van een fase: benoem het checkpoint uit het plan en vertel me
@@ -71,6 +74,32 @@ Ik bouw in fases (A t/m F, zie `docs/PLAN.md` sectie 5). Per sessie doen we
 
 ## Omgeving
 
-- Ik werk op Windows met Git Bash. Geef commando's die daar werken.
-- De VPS draait Ubuntu 24.04.
-- Leg terminal- en serverstappen uit alsof ik ze voor het eerst doe.
+**Namen.** "InterServer" is de online server (`162.35.176.40`, Ubuntu 24.04) die
+`https://tickets.mijnonline.shop` draait. "De laptop" is Amresh' Windows-machine.
+Gebruik het woord "VPS" niet: dat verwees zowel naar de server als naar de
+werkplek, en dat was precies de verwarring.
+
+**Claude Code draait op InterServer zelf.** Er is geen tweede machine — alleen
+twee mappen:
+
+| Map | Wat | Database | Poort |
+|---|---|---|---|
+| `/home/amresh/ticketsysteem` | **PRODUCTIE** | `ticketsysteem` | 3100 (PM2) |
+| `/home/amresh/dev/ticketsysteem` | dev, hier werk je | `ticketsysteem_dev` | 3300 |
+| idem, `.env.test` | test | `ticketsysteem_test` | 3200 |
+
+**In de productiemap wordt niet ontwikkeld.** Nooit `npm run dev`, nooit een
+seed-script, nooit een losse `npm run build`. Die map krijgt alleen de
+deployprocedure uit `infra/DEPLOY.md`, en `git status` hoort daar altijd leeg te
+zijn. Werk je aan code, dan is de dev-map de plek.
+
+- **Bij twijfel over waar je zit: `npm run db:omgeving`.** Dat toont database,
+  `APP_ENV`, marker en of ze met elkaar kloppen. Doe dit vóór elk db-commando
+  waarvan je de uitkomst niet zeker weet.
+- Migreren: `db:migrate` (dev), `db:migrate:test`, `db:migrate:prod`. Er is geen
+  commando dat "de standaard" database pakt — dat was juist het probleem.
+- Amresh werkt op Windows met Git Bash; geef hem commando's die daar werken. Draai
+  je zelf iets, dan is dat Ubuntu. Benoem welke van de twee je bedoelt.
+- InterServer heeft 1,9 GB RAM. Niet twee builds tegelijk, en laat dev- en
+  test-server niet standaard allebei aan staan.
+- Leg terminal- en serverstappen uit alsof hij ze voor het eerst doet.

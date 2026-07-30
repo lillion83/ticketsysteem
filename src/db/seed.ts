@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { closeDb, db } from './index'
+import { GuardFout, weigerOpProductie } from './guard'
 import {
   eventAgenda,
   eventFaq,
@@ -15,6 +16,8 @@ import { signTicket } from '../lib/ticketcode'
 // tickettypes én discovery-inhoud (categorie, beschrijving, sprekers, agenda, FAQ).
 // Draaien met: npm run db:seed  (vereist een migratie-gedraaide database)
 async function seed() {
+  await weigerOpProductie('db:seed')
+
   const [organisatie] = await db
     .insert(organizations)
     .values({
@@ -138,7 +141,9 @@ seed()
     process.exit(0)
   })
   .catch(async (err) => {
-    console.error('Seed mislukt:', err)
+    // Bij een geweigerde guard is de melding het hele punt; geen stacktrace erbij.
+    if (err instanceof GuardFout) console.error(err.message)
+    else console.error('Seed mislukt:', err)
     await closeDb()
     process.exit(1)
   })

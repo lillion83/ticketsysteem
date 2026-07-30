@@ -3,16 +3,29 @@
 Werk dit een rustig moment door, minstens een week vóór het event (PLAN §7). Een
 uur oefenen bespaart een avond paniek. Vink af terwijl je gaat.
 
-> **Let op — dev en productie delen nu dezelfde database.** Maak voor de droogtest
-> een **apart TEST-event** aan (bv. naam "TEST — negeren"). Zo lopen testtickets
-> niet door je echte verkoop. Na afloop kun je dat event met rust laten of de
-> testtickets negeren; ze tellen alleen mee binnen dat TEST-event.
+> **Doe de droogtest op de test-omgeving, niet op productie.** Sinds 30 juli 2026
+> hebben dev, test en productie eigen databases; testtickets komen dus niet meer
+> tussen je echte verkoop. De test-omgeving draait op InterServer op poort 3200 met
+> database `ticketsysteem_test` — zie `docs/TESTDB.md`.
+>
+> Alleen de smoke-test onderaan ("Na de droogtest") doe je op productie: één event,
+> één ticket, één scan, en daarna weer weg.
+
+**De scanner testen vereist HTTPS.** De camera-API werkt alleen in een secure
+context, dus `http://localhost:3200` via een tunnel is niet genoeg voor een echte
+telefoontest. Geef de test-omgeving daarom een eigen https-adres: een tweede
+Caddy-siteblok voor `test-tickets.mijnonline.shop` dat naar `localhost:3200`
+proxyt, met `basic_auth` zodat hij niet publiek toegankelijk is. Kosten: één
+A-record bij Porkbun en één `caddy reload`. Zonder dat kun je secties 1 en 3 niet
+eerlijk testen.
 
 ---
 
 ## 0. Voorbereiding
 
-- [ ] Log in op de admin (tickets.mijnonline.shop) en maak een **TEST-event** aan.
+- [ ] Log in op de test-omgeving (`test-tickets.mijnonline.shop`, of
+      `http://localhost:3200` via de tunnel voor alles behalve de camera) en maak
+      een **TEST-event** aan.
 - [ ] Maak 1–2 tickettypes aan (bv. "Regulier", "VIP").
 - [ ] Geef **±10 testtickets** uit met verschillende namen. (50 mag ook; 10 dekt
       alle scenario's al.) Zet bij minstens één een **eigen e-mailadres** en één
@@ -110,6 +123,13 @@ Doe dit op de échte locatie, mét het deurtoestel.
 
 ## Na de droogtest
 
-- [ ] Het TEST-event met rust laten of negeren (testtickets tellen alleen binnen
-      dat event). Maak het échte event apart aan.
+- [ ] De test-database mag gewoon leeg: zie "Schoon beginnen" in `docs/TESTDB.md`.
+      Je hoeft niets te ontzien — dit is niet meer dezelfde database als je verkoop.
+- [ ] **Smoke-test op productie**, kort en gericht: maak op
+      `tickets.mijnonline.shop` één event aan, geef één ticket uit aan jezelf, scan
+      het aan de deur, en verwijder het event daarna weer. Dit is de enige test die
+      productie raakt, en hij bewijst wat de test-omgeving niet kan bewijzen: dat
+      het echte domein, het echte certificaat, de echte mailkey en het echte
+      `TICKET_SECRET` samen werken.
+- [ ] Maak daarna het échte event aan.
 - [ ] Twijfel over een scenario? Noteer het en pak het op vóór de dag zelf.

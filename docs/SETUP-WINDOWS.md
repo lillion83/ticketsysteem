@@ -6,13 +6,29 @@ verdergaat.
 
 Aan het eind heb je:
 
-| Omgeving   | URL                     | Database                |
-| ---------- | ----------------------- | ----------------------- |
-| dev        | <http://localhost:3000> | `ticketsysteem`         |
-| test       | <http://localhost:3200> | `ticketsysteem_test`    |
-| productie  | de VPS                  | staat los, blijft draaien |
+| Omgeving  | URL                     | Database             | `APP_ENV`     |
+| --------- | ----------------------- | -------------------- | ------------- |
+| dev       | <http://localhost:3000> | `ticketsysteem_dev`  | `development` |
+| test      | <http://localhost:3200> | `ticketsysteem_test` | `test`        |
 
-De VPS wordt hierdoor niet geraakt. Alles hieronder is lokaal.
+**Productie staat op InterServer en wordt hierdoor niet geraakt.** Alles hieronder
+is lokaal, op je eigen laptop, met eigen databases en eigen geheimen.
+
+> De database die alleen `ticketsysteem` heet — zonder achtervoegsel — is de
+> **productiedatabase op InterServer**. Op je laptop bestaat die naam niet; jij
+> gebruikt `ticketsysteem_dev` en `ticketsysteem_test`. Zo betekent de naam overal
+> hetzelfde en kun je de twee nooit verwarren.
+
+Waar wordt er gewerkt? Op drie plekken, in twee rollen:
+
+| Plek | Rol |
+| --- | --- |
+| Deze laptop | ontwikkelen en testen |
+| `/home/amresh/dev/ticketsysteem` op InterServer | ontwikkelen en testen (waar Claude werkt) |
+| `/home/amresh/ticketsysteem` op InterServer | **alleen productie**, krijgt alleen een deploy |
+
+De laptop en de dev-map op InterServer zijn gelijkwaardig en praten met elkaar via
+`origin/main` op GitHub. Productie haalt daar alleen op — zie `infra/DEPLOY.md`.
 
 ---
 
@@ -45,7 +61,7 @@ git --version
 Download de **LTS-versie van Node 22** (Windows Installer, .msi):
 <https://nodejs.org/en/download>
 
-Klik door met de standaardinstellingen. De VPS draait Node 22, dus door hier ook
+Klik door met de standaardinstellingen. InterServer draait Node 22, dus door hier ook
 22 te nemen krijg je geen verrassingen bij het bouwen.
 
 Sluit Git Bash na de installatie en open hem opnieuw, anders kent hij `node` nog
@@ -59,7 +75,7 @@ node -v && npm -v
 
 ## 3. PostgreSQL 16 installeren
 
-Download de Windows-installer van EDB (kies **versie 16**, dat is wat de VPS
+Download de Windows-installer van EDB (kies **versie 16**, dat is wat InterServer
 draait): <https://www.enterprisedb.com/downloads/postgres-postgresql-downloads>
 
 Tijdens de installatie:
@@ -101,18 +117,29 @@ Log in als superuser. Hij vraagt om het `postgres`-wachtwoord uit de installatie
 psql -U postgres -h localhost
 ```
 
-Je krijgt nu een `postgres=#` prompt. Plak deze vier regels (het wachtwoord
+Je krijgt nu een `postgres=#` prompt. Plak deze regels (het wachtwoord
 `ticket_lokaal` mag je vervangen, maar onthoud het — het moet straks in
 `DATABASE_URL`):
 
 ```sql
 CREATE USER ticket WITH PASSWORD 'ticket_lokaal';
-CREATE DATABASE ticketsysteem OWNER ticket;
+CREATE DATABASE ticketsysteem_dev OWNER ticket;
 CREATE DATABASE ticketsysteem_test OWNER ticket;
+COMMENT ON DATABASE ticketsysteem_dev IS 'app_env=development';
+COMMENT ON DATABASE ticketsysteem_test IS 'app_env=test';
 \q
 ```
 
 Die laatste `\q` sluit psql af.
+
+De twee `COMMENT`-regels zijn geen bijzaak: de seed-scripts lezen die marker en
+**weigeren te draaien op een database zonder marker**, omdat onbekend voor hen niet
+hetzelfde is als veilig. Sla je ze over, dan krijg je straks bij `npm run db:seed`
+een melding die je hierheen terugstuurt.
+
+Had je al een database `ticketsysteem` op je laptop van de oude opzet? Die kun je
+opruimen met `DROP DATABASE ticketsysteem;` — die naam is nu voorbehouden aan
+productie op InterServer.
 
 Controle — dit moet zonder foutmelding een lege prompt geven:
 
@@ -165,7 +192,10 @@ Open beide in een editor (`notepad .env` werkt, of gebruik VS Code) en pas aan:
 **In `.env`:**
 
 ```
-DATABASE_URL=postgresql://ticket:ticket_lokaal@localhost:5432/ticketsysteem
+APP_ENV=development
+PORT=3000
+DATABASE_URL=postgresql://ticket:ticket_lokaal@localhost:5432/ticketsysteem_dev
+UPLOAD_DIR=./uploads
 TICKET_SECRET=<lang willekeurig geheim>
 BETTER_AUTH_SECRET=<lang willekeurig geheim>
 BETTER_AUTH_URL=http://localhost:3000
@@ -176,16 +206,26 @@ ADMIN_PASSWORD=<wachtwoord waarmee je lokaal inlogt>
 ADMIN_NAME=Amresh
 ```
 
-**In `.env.test`** hetzelfde, maar met `ticketsysteem_test` als database en
-poort 3200 in `BETTER_AUTH_URL` en `PUBLIC_BASE_URL`.
+**In `.env.test`** hetzelfde, maar met `APP_ENV=test`, `ticketsysteem_test` als
+database, `PORT=3200`, poort 3200 in `BETTER_AUTH_URL` en `PUBLIC_BASE_URL`, en
+`UPLOAD_DIR=./uploads-test`.
 
-Twee dingen om te weten:
+Vier dingen om te weten:
 
+- **`APP_ENV` is verplicht.** Zonder die regel start de app niet en weigeren de
+  migraties. Hij vertelt elk script in welke omgeving het zit, zodat niets per
+  ongeluk op productie uitkomt.
+- **`PORT` bepaalt de poort** van `npm run dev`. Vroeger stond die vast op 3000 in
+  het script; nu komt hij uit het env-bestand, zodat dezelfde code op de laptop
+  (3000) en in de dev-map op InterServer (3300) werkt.
 - **`MAIL_API_KEY` leeg laten.** Dan wordt uitgaande mail alleen naar de console
-  gelogd in plaats van echt verstuurd — precies wat je lokaal wilt.
-- **De geheimen mogen anders zijn dan op de VPS**, en dat horen ze ook te zijn.
-  Gevolg: ticketcodes uit productie zijn lokaal ongeldig, en andersom. Dat klopt
-  en is de bedoeling — het zijn gescheiden werelden met gescheiden databases.
+  gelogd in plaats van echt verstuurd — precies wat je lokaal wilt. Zet je hier
+  wél een echte key, dan weigert de app te starten: buiten productie mag geen
+  echte mail de deur uit.
+- **De geheimen mogen anders zijn dan op InterServer**, en dat horen ze ook te
+  zijn. Gevolg: ticketcodes uit productie zijn lokaal ongeldig, en andersom. Dat
+  klopt en is de bedoeling — anders zou een lokaal aangemaakt testticket aan de
+  echte deur groen scannen.
 
 Nieuwe geheimen genereren kan met:
 
@@ -277,6 +317,22 @@ ignored") en opent psql gewoon een sessie. Gebruik in plaats daarvan:
 **`WARNING: Console code page (437) differs from Windows code page (1252)`**
 Onschuldig. Gaat alleen over hoe accenttekens in psql-uitvoer worden getoond.
 
+**`db:seed is geweigerd: deze database heeft geen omgevingsmarker`**
+De vangrail doet zijn werk: hij weet niet of dit productie is. Zet de marker één
+keer (zie stap 5), en kijk met `npm run db:omgeving` of het klopt.
+
+**`.env hoort bij een development-omgeving, maar APP_ENV is ...`**
+Het env-bestand en het script horen niet bij elkaar. `db:migrate` hoort bij `.env`,
+`db:migrate:test` bij `.env.test`. Controleer de `APP_ENV`-regel bovenaan.
+
+**`Omgevingsfout: APP_ENV is niet gezet`**
+Je `.env` komt uit de oude opzet. Voeg `APP_ENV=development` toe (en `PORT` en
+`UPLOAD_DIR`, zie stap 6) of begin opnieuw vanaf `.env.example`.
+
+**`Port 3000 is already in use`**
+Iets anders draait er al. De poort komt nu uit `PORT` in je `.env`; zet die op een
+vrije waarde in plaats van het script aan te passen.
+
 **`Found ~/.bashrc but no ~/.bash_profile`**
 Onschuldig. Git Bash maakt de ontbrekende `~/.bash_profile` zelf aan en laadt
 daarmee je `~/.bashrc` alsnog in. Sluit het venster en open het opnieuw.
@@ -285,17 +341,44 @@ daarmee je `~/.bashrc` alsnog in. Sluit het venster en open het opnieuw.
 
 ## Dagelijks gebruik hierna
 
-Werk ophalen dat op de VPS is gemaakt:
+**Werk ophalen** dat in de dev-map op InterServer is gemaakt (daar werkt Claude):
 
 ```bash
 git pull
 ```
 
-Zijn er na een `git pull` nieuwe dependencies of migraties, draai dan:
+Zijn er nieuwe dependencies of migraties, draai dan:
 
 ```bash
 npm ci && npm run db:migrate
 ```
+
+**Eigen werk terugsturen:** committen en `git push` naar `main`. De laptop en de
+dev-map op InterServer zijn gelijkwaardig; `origin/main` is de enige plek waar ze
+elkaar tegenkomen. Trek altijd eerst op vóór je begint, anders krijg je een merge
+die je niet nodig had.
+
+**Live zetten doet de laptop niet.** Deployen gebeurt op InterServer, in de
+productiemap, volgens `infra/DEPLOY.md`. Een `git push` alleen verandert niets aan
+de live site.
+
+**Weten waar je zit:**
+
+```bash
+npm run db:omgeving
+```
+
+Toont database, `APP_ENV`, de marker op de database en of die twee met elkaar
+kloppen. Draai dit als je twijfelt vóór een db-commando.
+
+**Meekijken met wat er op InterServer draait.** De dev-server (3300) en
+test-server (3200) staan daar niet open op internet. Tunnel ze naar je laptop:
+
+```bash
+ssh -L 3300:localhost:3300 -L 3200:localhost:3200 amresh@162.35.176.40
+```
+
+Laat dat venster open staan en open dan `http://localhost:3300` in je browser hier.
 
 Zie `docs/TESTDB.md` voor het werken met de test-database, en `docs/PLAN.md`
 voor de scope en het datamodel.

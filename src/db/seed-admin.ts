@@ -3,6 +3,7 @@ import { betterAuth } from 'better-auth'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { eq } from 'drizzle-orm'
 import { closeDb, db, schema } from './index'
+import { GuardFout, weigerOpProductie } from './guard'
 
 // Maakt het admin-account (Amresh) aan en koppelt het aan de geseede organisatie.
 // Draaien met: npm run db:seed-admin  (na db:migrate en db:seed)
@@ -26,6 +27,8 @@ const seedAuth = betterAuth({
 })
 
 async function seedAdmin() {
+  await weigerOpProductie('db:seed-admin')
+
   const email = process.env.ADMIN_EMAIL ?? 'amresh@example.com'
   const password = process.env.ADMIN_PASSWORD ?? 'verander-mij-nu'
   const name = process.env.ADMIN_NAME ?? 'Amresh'
@@ -88,7 +91,8 @@ seedAdmin()
     process.exit(0)
   })
   .catch(async (err) => {
-    console.error('Admin-seed mislukt:', err)
+    if (err instanceof GuardFout) console.error(err.message)
+    else console.error('Admin-seed mislukt:', err)
     await closeDb()
     process.exit(1)
   })

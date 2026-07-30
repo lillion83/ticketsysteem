@@ -3,6 +3,7 @@ import { betterAuth } from 'better-auth'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { eq } from 'drizzle-orm'
 import { closeDb, db, schema } from './index'
+import { GuardFout, weigerOpProductie } from './guard'
 
 // Zet het wachtwoord van het admin-account op de waarde van ADMIN_PASSWORD.
 // Draaien met: npm run db:reset-admin-password
@@ -30,6 +31,8 @@ const resetAuth = betterAuth({
 })
 
 async function resetAdminPassword() {
+  await weigerOpProductie('db:reset-admin-password')
+
   const email = process.env.ADMIN_EMAIL
   const password = process.env.ADMIN_PASSWORD
 
@@ -66,7 +69,8 @@ resetAdminPassword()
     process.exit(0)
   })
   .catch(async (err) => {
-    console.error('Wachtwoordreset mislukt:', err)
+    if (err instanceof GuardFout) console.error(err.message)
+    else console.error('Wachtwoordreset mislukt:', err)
     await closeDb()
     process.exit(1)
   })

@@ -1,8 +1,34 @@
-Welcome to your new TanStack Start app!
+# Ticketsysteem
+
+E-ticketsysteem met QR-codes en een deurscanner. Zie `docs/PLAN.md` voor de scope
+en het datamodel, en `CLAUDE.md` voor de harde regels.
+
+## Begin hier, niet bij `npm run dev`
+
+Deze app praat met een database en heeft per omgeving een eigen env-bestand. Zonder
+die opzet start hij niet.
+
+| Ik wil… | Lees dit |
+| --- | --- |
+| lokaal opzetten op Windows | `docs/SETUP-WINDOWS.md` |
+| met de test-database werken | `docs/TESTDB.md` |
+| live zetten | `infra/DEPLOY.md` |
+
+**Drie omgevingen, elk met eigen database, poort en env-bestand:**
+
+| | Database | Poort | Env | `APP_ENV` |
+|---|---|---|---|---|
+| dev | `ticketsysteem_dev` | uit `PORT` | `.env` | `development` |
+| test | `ticketsysteem_test` | 3200 | `.env.test` | `test` |
+| productie | `ticketsysteem` | 3100 | `.env.production` | `production` |
+
+De database die alleen `ticketsysteem` heet is **productie**. Seed- en
+resetscripts weigeren daar te draaien; `npm run db:omgeving` vertelt je waar je zit.
+
+Productie draait op InterServer onder PM2 achter Caddy. De build-output is
+`.output/server/index.mjs`.
 
 # Getting Started
-
-To run this application:
 
 ```bash
 npm install
@@ -10,8 +36,6 @@ npm run dev
 ```
 
 # Building For Production
-
-To build this application for production:
 
 ```bash
 npm run build
@@ -42,18 +66,22 @@ npm run check
 ```
 
 
-## Deploy with Nitro
+## Deploy
 
-This project uses Nitro as a generic server adapter, so it can run on any Node-compatible host.
+Dit project gebruikt Nitro als server-adapter. **De echte procedure staat in
+`infra/DEPLOY.md`** — volg die, niet de generieke stappen hieronder: deployen hier
+omvat een back-up vóór de migratie, een omgevingscontrole en een specifieke
+PM2-herstart.
+
+De build-output is `.output/server/index.mjs` (niet `dist/`, zoals de
+TanStack-scaffold suggereerde):
 
 ```bash
 npm run build
-node dist/server/index.mjs
+node .output/server/index.mjs
 ```
 
-The build output is a self-contained Node server. To deploy, push the `dist/` directory to your host (Render, Fly.io, your own VPS, etc.) and run the server command above.
-
-For host-specific presets (Vercel, Netlify, Cloudflare, AWS Lambda, etc.) and tuning, see https://v3.nitro.build/deploy.
+Voor host-specifieke presets en tuning: https://v3.nitro.build/deploy.
 
 
 

@@ -3,15 +3,28 @@ import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 
 // Opslag van geüploade afbeeldingen (cover-afbeeldingen van events).
-// Bestanden staan op de schijf van de VPS, buiten de repo, en worden
+// Bestanden staan op de schijf van InterServer, buiten de repo, en worden
 // uitgeserveerd door `src/routes/uploads.$bestand.ts` op /uploads/{bestand}.
 // Bewust niet in Postgres: de database blijft zo klein en snel te dumpen.
 // Let op bij backups: deze map zit NIET in de database-dump, neem hem apart mee.
 
-// Standaard `./uploads` naast de repo-root (pm2 draait daar), te overriden met
-// UPLOAD_DIR. Absoluut gemaakt zodat het niet uitmaakt vanuit welke map je start.
+// Elke omgeving heeft zijn eigen map, via UPLOAD_DIR. Zonder die scheiding
+// schreven dev, test en productie in dezelfde map: een lokale testupload landde
+// dan naast de echte covers, en een opgeruimde map maakte productiecovers 404.
+//
+// Buiten productie mag `./uploads` als gemak blijven bestaan. In productie is een
+// cwd-relatief pad geen gemak maar een bug-in-wachtpositie — een `git clean -xdf`
+// of een verplaatste checkout neemt de klantdata dan mee — dus daar eisen we een
+// expliciet, absoluut pad.
 export function uploadDir(): string {
-  return path.resolve(process.env.UPLOAD_DIR ?? './uploads')
+  const ingesteld = process.env.UPLOAD_DIR
+  if (!ingesteld && process.env.APP_ENV === 'production') {
+    throw new Error(
+      'UPLOAD_DIR moet in productie expliciet gezet zijn (bijvoorbeeld ' +
+        '/home/amresh/ticketsysteem-data/uploads). Zie infra/DEPLOY.md.',
+    )
+  }
+  return path.resolve(ingesteld ?? './uploads')
 }
 
 export const MAX_UPLOAD_BYTES = 5 * 1024 * 1024
