@@ -25,14 +25,22 @@ import {
   listSprekers,
 } from '#/server/eventContent'
 import {
-  afwijzenReservering,
-  listReserveringen,
-  verwerkReservering,
-} from '#/server/reserveringen'
+  annuleerTicketaanvraag,
+  betaalEnVerstuur,
+  listTicketaanvragen,
+  markeerBetaald,
+  ticketsVoorAanvraag,
+} from '#/server/ticketaanvragen'
 import { eventCategories } from '#/components/discovery/data'
 import { CoverUpload } from '#/components/cover-upload'
 import { ticketBericht, whatsappLink } from '#/lib/whatsapp'
 import { kortCode } from '#/lib/scanResult'
+import {
+  VERKOOPKANAAL_LABEL,
+  VERKOOPKANALEN,
+  verkoopkanaalLabel,
+} from '#/lib/verkoopkanaal'
+import type { Verkoopkanaal } from '#/lib/verkoopkanaal'
 
 type Categorie = (typeof eventCategories)[number]
 
@@ -46,7 +54,7 @@ export const Route = createFileRoute('/admin/events/$eventId')({
       sprekers,
       agenda,
       faq,
-      reserveringen,
+      ticketaanvragen,
     ] = await Promise.all([
       getEvent({ data: params.eventId }),
       listTicketTypes({ data: params.eventId }),
@@ -55,7 +63,7 @@ export const Route = createFileRoute('/admin/events/$eventId')({
       listSprekers({ data: params.eventId }),
       listAgenda({ data: params.eventId }),
       listFaq({ data: params.eventId }),
-      listReserveringen({ data: params.eventId }),
+      listTicketaanvragen({ data: params.eventId }),
     ])
     return {
       event,
@@ -65,7 +73,7 @@ export const Route = createFileRoute('/admin/events/$eventId')({
       sprekers,
       agenda,
       faq,
-      reserveringen,
+      ticketaanvragen,
     }
   },
   component: EventDetail,
@@ -160,13 +168,46 @@ function GhostBtn({
   )
 }
 
+/**
+ * Rij keuzechips. Vaste keuzes in plaats van een vrij tekstveld — anders is de
+ * rapportage achteraf waardeloos.
+ */
+function ChipGroep<T extends string>({
+  opties,
+  waarde,
+  onKies,
+}: {
+  opties: ReadonlyArray<{ waarde: T; label: string }>
+  waarde: T | null
+  onKies: (waarde: T) => void
+}) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      {opties.map((o) => (
+        <button
+          key={o.waarde}
+          type="button"
+          onClick={() => onKies(o.waarde)}
+          className={`rounded-full border px-3.5 py-2 text-[13px] font-semibold ${
+            o.waarde === waarde
+              ? 'border-[#2563EB] bg-[#2563EB] text-white'
+              : 'border-[#E5E7EB] bg-white text-[#334155] hover:border-[#93C5FD]'
+          }`}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 function EventDetail() {
   const { event, types } = Route.useLoaderData()
 
   return (
     <div className="flex flex-col gap-6">
       <EventSectie />
-      <ReserveringenSectie />
+      <TicketaanvragenSectie />
       <TicketTypesSectie />
       <SprekersSectie />
       <AgendaSectie />
@@ -624,112 +665,532 @@ function FaqSectie() {
   )
 }
 
-function ReserveringenSectie() {
-  const { reserveringen } = Route.useLoaderData()
-  const router = useRouter()
-  const [fout, setFout] = useState<string | null>(null)
-  const [bezigId, setBezigId] = useState<string | null>(null)
+// ── Ticketaanvragen ──────────────────────────────────────────────────────────
+// Heette "Reserveringen"; de tabel houdt die naam, de UI niet meer. Het woord
+// "reservering" komt hier bewust nergens meer voor (Migratieplan §5).
 
-  const open = reserveringen.filter((r) => r.status === 'nieuw')
-  const afgehandeld = reserveringen.filter((r) => r.status !== 'nieuw')
+type Ticketaanvraag = ReturnType<
+  typeof Route.useLoaderData
+>['ticketaanvragen'][number]
 
-  async function actie(id: string, fn: () => Promise<unknown>) {
-    setFout(null)
-    setBezigId(id)
-    try {
-      await fn()
-      router.invalidate()
-    } catch (err) {
-      setFout(err instanceof Error ? err.message : 'Actie mislukt')
-    } finally {
-      setBezigId(null)
+/** DB-status → label en badgekleur, één op één uit het ontwerp. */
+const AANVRAAG_STATUS: Record<string, { label: string; cls: string }> = {
+  nieuw: { label: 'Wacht op betaling', cls: 'bg-[#FEF3C7] text-[#B45309]' },
+  betaald: { label: 'Betaald', cls: 'bg-[#DBEAFE] text-[#1D4ED8]' },
+  afgehandeld: {
+    label: 'Ticket verzonden',
+    cls: 'bg-[#DCFCE7] text-[#15803D]',
+  },
+  geannuleerd: { label: 'Geannuleerd', cls: 'bg-[#FEE2E2] text-[#B91C1C]' },
+  // Historische waarde van vóór migratie 0012; toont hetzelfde label.
+  afgewezen: { label: 'Geannuleerd', cls: 'bg-[#FEE2E2] text-[#B91C1C]' },
+  verlopen: { label: 'Verlopen', cls: 'bg-[#F1F5F9] text-[#94A3B8]' },
+}
+
+function statusInfo(status: string) {
+  return (
+    AANVRAAG_STATUS[status] ?? {
+      label: status,
+      cls: 'bg-[#F1F5F9] text-[#475569]',
     }
+  )
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const { label, cls } = statusInfo(status)
+  return (
+    <span
+      className={`flex-none rounded-full px-2.5 py-1 text-[11px] font-extrabold whitespace-nowrap ${cls}`}
+    >
+      {label}
+    </span>
+  )
+}
+
+/** Bedrag van een aanvraag: aantal × prijs van het tickettype. */
+function aanvraagBedrag(a: Ticketaanvraag): string {
+  const bedrag = Number(a.prijs_srd) * Math.max(Number(a.aantal), 1)
+  return `SRD ${bedrag.toLocaleString('nl-NL')}`
+}
+
+function relatieveTijd(datum: Date | string): string {
+  const min = Math.round((Date.now() - new Date(datum).getTime()) / 60000)
+  if (min < 1) return 'zojuist'
+  if (min < 60) return `${min} min geleden`
+  const uur = Math.round(min / 60)
+  if (uur < 24) return `${uur} uur geleden`
+  const dag = Math.round(uur / 24)
+  return dag === 1 ? 'gisteren' : `${dag} dagen geleden`
+}
+
+const TABS = [
+  { key: 'alles', label: 'Alles' },
+  { key: 'nieuw', label: 'Wacht op betaling' },
+  { key: 'betaald', label: 'Betaald' },
+] as const
+
+function TicketaanvragenSectie() {
+  const { ticketaanvragen } = Route.useLoaderData()
+  const router = useRouter()
+  const [tab, setTab] = useState<(typeof TABS)[number]['key']>('alles')
+  const [openId, setOpenId] = useState<string | null>(null)
+  const [selectie, setSelectie] = useState<Array<string>>([])
+  const [bulkOpen, setBulkOpen] = useState(false)
+  const [fout, setFout] = useState<string | null>(null)
+  const [bezig, setBezig] = useState(false)
+
+  const wacht = ticketaanvragen.filter((a) => a.status === 'nieuw')
+  const betaald = ticketaanvragen.filter((a) => a.status === 'betaald')
+  const afgerond = ticketaanvragen.filter((a) => a.status === 'afgehandeld')
+
+  const lijst =
+    tab === 'nieuw' ? wacht : tab === 'betaald' ? betaald : ticketaanvragen
+  const detail = ticketaanvragen.find((a) => a.id === openId) ?? null
+
+  function toggleSelectie(id: string) {
+    setSelectie((s) =>
+      s.includes(id) ? s.filter((x) => x !== id) : [...s, id],
+    )
+  }
+
+  /** Bulkactie: elke aanvraag apart, zodat één fout de rest niet blokkeert. */
+  async function bulkAfhandelen() {
+    setFout(null)
+    setBezig(true)
+    const mislukt: Array<string> = []
+    for (const id of selectie) {
+      try {
+        await betaalEnVerstuur({ data: id })
+      } catch (err) {
+        const naam = ticketaanvragen.find((a) => a.id === id)?.naam ?? id
+        mislukt.push(
+          `${naam}: ${err instanceof Error ? err.message : 'mislukt'}`,
+        )
+      }
+    }
+    setSelectie([])
+    setBezig(false)
+    if (mislukt.length > 0) setFout(mislukt.join(' · '))
+    await router.invalidate()
   }
 
   return (
     <Kaart>
-      <h2 className="mb-4 flex items-center text-[16px] font-extrabold">
-        Reserveringen
-        {open.length > 0 && (
-          <span className="ml-2 rounded-full bg-[#2563EB] px-2.5 py-0.5 text-[11px] font-bold text-white">
-            {open.length} nieuw
-          </span>
-        )}
-      </h2>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <h2 className="text-[16px] font-extrabold">
+          Ticketaanvragen
+          {wacht.length > 0 && (
+            <span className="ml-2 rounded-full bg-[#FEF3C7] px-2.5 py-0.5 text-[11px] font-bold text-[#B45309]">
+              {wacht.length} wacht op betaling
+            </span>
+          )}
+        </h2>
+      </div>
+
+      <div className="mb-4 grid grid-cols-3 gap-2.5">
+        <Tegel
+          waarde={wacht.length}
+          label="Wacht op betaling"
+          kleur="#F59E0B"
+        />
+        <Tegel
+          waarde={betaald.length}
+          label="Klaar om te sturen"
+          kleur="#2563EB"
+        />
+        <Tegel waarde={afgerond.length} label="Afgerond" kleur="#16A34A" />
+      </div>
+
+      <div className="mb-3 flex gap-5 border-b border-[#E5E7EB]">
+        {TABS.map((t) => (
+          <button
+            key={t.key}
+            type="button"
+            onClick={() => setTab(t.key)}
+            className={`-mb-px border-b-2 pb-2.5 text-[13.5px] font-extrabold ${
+              tab === t.key
+                ? 'border-[#2563EB] text-[#2563EB]'
+                : 'border-transparent text-[#94A3B8] hover:text-[#64748B]'
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
       {fout && (
-        <p className="mb-2 text-[14px] font-semibold text-[#DC2626]">{fout}</p>
+        <p className="mb-2 text-[13.5px] font-semibold text-[#DC2626]">
+          {fout}
+        </p>
       )}
-      {reserveringen.length === 0 ? (
-        <p className="text-[13.5px] text-[#64748B]">Nog geen reserveringen.</p>
+
+      {ticketaanvragen.length === 0 ? (
+        <p className="text-[13.5px] text-[#64748B]">
+          Nog geen ticketaanvragen. Zodra iemand op de eventpagina een ticket
+          aanvraagt, verschijnt hij hier.
+        </p>
       ) : (
-        <div className="flex flex-col gap-2">
-          {open.map((r) => (
-            <div
-              key={r.id}
-              className="flex flex-col gap-2 rounded-[12px] border border-[#E5E7EB] bg-[#F8FAFC] p-3.5 sm:flex-row sm:items-center sm:justify-between"
-            >
-              <div className="text-[13.5px]">
-                <div className="font-bold">
-                  {r.naam} · {r.aantal}× {r.type_naam}
+        <div className="grid gap-4 lg:grid-cols-[1fr_380px]">
+          <div className="flex flex-col gap-2">
+            {lijst.length === 0 ? (
+              <p className="text-[13.5px] text-[#64748B]">
+                Geen aanvragen in deze weergave.
+              </p>
+            ) : (
+              lijst.map((a) => (
+                <div
+                  key={a.id}
+                  className={`flex items-center gap-3 rounded-[14px] border bg-white p-3.5 ${
+                    a.id === openId
+                      ? 'border-[#2563EB]'
+                      : 'border-[#E5E7EB] hover:border-[#93C5FD]'
+                  }`}
+                >
+                  {bulkOpen && (
+                    <input
+                      type="checkbox"
+                      checked={selectie.includes(a.id)}
+                      onChange={() => toggleSelectie(a.id)}
+                      disabled={a.status !== 'nieuw' && a.status !== 'betaald'}
+                      className="h-4 w-4 flex-none accent-[#2563EB]"
+                      aria-label={`Selecteer ${a.naam}`}
+                    />
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setOpenId(a.id === openId ? null : a.id)}
+                    className="flex min-w-0 flex-1 flex-col gap-1 text-left"
+                  >
+                    <div className="flex items-start justify-between gap-2.5">
+                      <div className="min-w-0">
+                        <div className="truncate text-[14.5px] font-extrabold">
+                          {a.naam}
+                        </div>
+                        <div className="truncate text-[12.5px] text-[#64748B]">
+                          {a.aantal}× {a.type_naam}
+                          {verkoopkanaalLabel(a.betaalmethode)
+                            ? ` · ${verkoopkanaalLabel(a.betaalmethode)}`
+                            : ''}
+                        </div>
+                      </div>
+                      <StatusBadge status={a.status} />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono text-[12px] text-[#94A3B8]">
+                        {relatieveTijd(a.aangemaakt_op)}
+                      </span>
+                      <span className="text-[13.5px] font-extrabold">
+                        {aanvraagBedrag(a)}
+                      </span>
+                    </div>
+                  </button>
                 </div>
-                <div className="text-[#64748B]">
-                  {[r.email, r.telefoon].filter(Boolean).join(' · ') ||
-                    'geen contactgegevens'}
-                  {r.opmerking ? ` — "${r.opmerking}"` : ''}
-                </div>
-              </div>
-              <div className="flex gap-2">
+              ))
+            )}
+
+            {/* Bulk is bewust secundair: de hoofdinteractie is één aanvraag. */}
+            {!bulkOpen ? (
+              <button
+                type="button"
+                onClick={() => setBulkOpen(true)}
+                className="mt-1 py-2 text-[13px] font-semibold text-[#64748B] hover:text-[#0F172A]"
+              >
+                Meerdere tegelijk afhandelen
+              </button>
+            ) : (
+              <div className="mt-1 flex flex-wrap items-center gap-3 rounded-[12px] bg-[#F8FAFC] px-3.5 py-2.5">
+                <span className="text-[13px] text-[#64748B]">
+                  {selectie.length} geselecteerd
+                </span>
                 <PrimaryBtn
                   size="sm"
-                  disabled={bezigId === r.id}
-                  onClick={() =>
-                    actie(r.id, () => verwerkReservering({ data: r.id }))
-                  }
+                  disabled={selectie.length === 0 || bezig}
+                  onClick={bulkAfhandelen}
                 >
-                  {bezigId === r.id ? 'Bezig…' : 'Ticket uitgeven'}
+                  {bezig ? 'Bezig…' : 'Betaald & ticket sturen'}
                 </PrimaryBtn>
                 <GhostBtn
-                  disabled={bezigId === r.id}
-                  onClick={() =>
-                    actie(r.id, () => afwijzenReservering({ data: r.id }))
-                  }
+                  onClick={() => {
+                    setBulkOpen(false)
+                    setSelectie([])
+                  }}
                 >
-                  Afwijzen
+                  Klaar
                 </GhostBtn>
               </div>
-            </div>
-          ))}
-          {afgehandeld.length > 0 && (
-            <details className="mt-1 text-[13.5px]">
-              <summary className="cursor-pointer font-semibold text-[#64748B]">
-                Afgehandeld ({afgehandeld.length})
-              </summary>
-              <div className="mt-2 flex flex-col gap-1">
-                {afgehandeld.map((r) => (
-                  <div
-                    key={r.id}
-                    className="flex justify-between rounded-[10px] border border-[#E5E7EB] px-3.5 py-2 text-[#64748B]"
-                  >
-                    <span>
-                      {r.naam} · {r.aantal}× {r.type_naam}
-                    </span>
-                    <span
-                      className={
-                        r.status === 'afgehandeld'
-                          ? 'font-semibold text-[#16A34A]'
-                          : 'text-[#94A3B8]'
-                      }
-                    >
-                      {r.status}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </details>
-          )}
+            )}
+          </div>
+
+          <div className="lg:border-l lg:border-[#E5E7EB] lg:pl-4">
+            {detail ? (
+              <AanvraagDetail
+                key={detail.id}
+                aanvraag={detail}
+                onKlaar={() => router.invalidate()}
+              />
+            ) : (
+              <p className="rounded-[14px] bg-[#F8FAFC] px-4 py-6 text-[13px] text-[#64748B]">
+                Kies een aanvraag om hem af te handelen.
+              </p>
+            )}
+          </div>
         </div>
       )}
     </Kaart>
+  )
+}
+
+function Tegel({
+  waarde,
+  label,
+  kleur,
+}: {
+  waarde: number
+  label: string
+  kleur: string
+}) {
+  return (
+    <div className="rounded-[12px] border border-[#E5E7EB] bg-white px-3.5 py-3">
+      <div
+        className="text-[20px] leading-none font-extrabold"
+        style={{ color: kleur }}
+      >
+        {waarde}
+      </div>
+      <div className="mt-1.5 text-[11.5px] font-bold text-[#64748B]">
+        {label}
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Detail van één aanvraag: contactgegevens, de statustijdlijn, en één primaire
+ * actie die per status verandert. De leverknoppen verschijnen zodra er tickets
+ * zijn — ze hangen aan de bestaande sendTicketMail / markDelivered.
+ */
+function AanvraagDetail({
+  aanvraag,
+  onKlaar,
+}: {
+  aanvraag: Ticketaanvraag
+  onKlaar: () => void
+}) {
+  const [bezig, setBezig] = useState(false)
+  const [fout, setFout] = useState<string | null>(null)
+  const [tickets, setTickets] = useState<Array<LeverbaarTicket> | null>(null)
+
+  const isAf =
+    aanvraag.status === 'afgehandeld' ||
+    aanvraag.status === 'geannuleerd' ||
+    aanvraag.status === 'afgewezen' ||
+    aanvraag.status === 'verlopen'
+
+  // Vier vaste stappen; welke afgevinkt zijn volgt uit de status en het
+  // betaalspoor, niet uit losse clientstate.
+  const gedaan =
+    aanvraag.status === 'afgehandeld'
+      ? 3
+      : aanvraag.status === 'betaald'
+        ? 1
+        : 0
+  const stappen = [
+    { label: 'Aangevraagd', tijd: aanvraag.aangemaakt_op },
+    { label: 'Betaling ontvangen', tijd: aanvraag.betaald_op },
+    { label: 'Ticket verzonden', tijd: aanvraag.afgehandeld_op },
+    { label: 'Afgerond', tijd: aanvraag.afgehandeld_op },
+  ]
+
+  async function actie(fn: () => Promise<unknown>) {
+    setFout(null)
+    setBezig(true)
+    try {
+      await fn()
+      onKlaar()
+    } catch (err) {
+      setFout(err instanceof Error ? err.message : 'Actie mislukt')
+    } finally {
+      setBezig(false)
+    }
+  }
+
+  async function laadTickets() {
+    setFout(null)
+    try {
+      setTickets(await ticketsVoorAanvraag({ data: aanvraag.id }))
+    } catch (err) {
+      setFout(err instanceof Error ? err.message : 'Tickets ophalen mislukt')
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div>
+        <div className="text-[16px] font-extrabold">{aanvraag.naam}</div>
+        <div className="text-[13px] text-[#64748B]">
+          {aanvraag.aantal}× {aanvraag.type_naam}
+        </div>
+      </div>
+
+      <div className="overflow-hidden rounded-[12px] border border-[#E5E7EB] text-[13px]">
+        <Regel label="Telefoon" waarde={aanvraag.telefoon} mono />
+        <Regel label="E-mail" waarde={aanvraag.email} />
+        <Regel label="Bedrag" waarde={aanvraagBedrag(aanvraag)} vet laatste />
+      </div>
+
+      {aanvraag.opmerking && (
+        <p className="rounded-[12px] bg-[#F8FAFC] px-3.5 py-2.5 text-[13px] text-[#475569]">
+          “{aanvraag.opmerking}”
+        </p>
+      )}
+
+      <div>
+        <div className="mb-3 text-[13px] font-extrabold">Status</div>
+        <div className="flex flex-col">
+          {stappen.map((s, i) => (
+            <div key={s.label} className="flex items-start gap-3">
+              <div className="flex flex-none flex-col items-center self-stretch">
+                {i <= gedaan ? (
+                  <span className="flex h-[22px] w-[22px] items-center justify-center rounded-full bg-[#22C55E] text-[12px] font-extrabold text-white">
+                    ✓
+                  </span>
+                ) : (
+                  <span className="h-[22px] w-[22px] rounded-full border-2 border-[#E2E8F0] bg-white" />
+                )}
+                {i < stappen.length - 1 && (
+                  <span className="min-h-[18px] w-0.5 flex-1 bg-[#E5E7EB]" />
+                )}
+              </div>
+              <div className="pb-3.5">
+                <div className="text-[13.5px] font-semibold">{s.label}</div>
+                <div className="text-[12px] text-[#94A3B8]">
+                  {i <= gedaan && s.tijd
+                    ? relatieveTijd(s.tijd)
+                    : i <= gedaan
+                      ? 'zojuist'
+                      : 'nog niet'}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {aanvraag.status === 'nieuw' && (
+        <p className="rounded-[12px] border border-[#FDE68A] bg-[#FFFBEB] px-3.5 py-3 text-[13px] leading-relaxed text-[#78350F]">
+          {verkoopkanaalLabel(aanvraag.betaalmethode)
+            ? `Deze bezoeker koos ${verkoopkanaalLabel(aanvraag.betaalmethode)}. `
+            : ''}
+          Zodra het geld binnen is, druk je op de knop hieronder — ticket en QR
+          gaan er meteen uit.
+        </p>
+      )}
+
+      {aanvraag.status === 'afgehandeld' && (
+        <div>
+          <div className="mb-1 text-[13px] font-extrabold">Stuur ticket</div>
+          <div className="mb-2.5 text-[12.5px] text-[#64748B]">
+            Zelfde QR-code, kies waar hij heen gaat.
+          </div>
+          {tickets === null ? (
+            <GhostBtn onClick={laadTickets}>Tickets ophalen</GhostBtn>
+          ) : tickets.length === 0 ? (
+            <p className="text-[13px] text-[#64748B]">
+              Geen tickets gevonden bij deze aanvraag. Zoek de koper op in de
+              verkooplijst hieronder.
+            </p>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {tickets.map((t) => (
+                <div
+                  key={t.id}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-[12px] border border-[#E5E7EB] px-3.5 py-2.5"
+                >
+                  <span className="font-mono text-[12px] font-semibold tracking-wider">
+                    {kortCode(t.code)}
+                  </span>
+                  <LeverKnoppen ticket={t} />
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {fout && (
+        <p className="text-[13px] font-semibold text-[#DC2626]">{fout}</p>
+      )}
+
+      {!isAf && (
+        <div className="flex flex-col gap-2">
+          <button
+            type="button"
+            disabled={bezig}
+            onClick={() => actie(() => betaalEnVerstuur({ data: aanvraag.id }))}
+            className="w-full rounded-full bg-[#2563EB] py-3.5 text-[14.5px] font-extrabold text-white hover:bg-[#1D4ED8] disabled:opacity-50"
+          >
+            {bezig
+              ? 'Bezig…'
+              : aanvraag.status === 'betaald'
+                ? 'Ticket sturen'
+                : 'Betaling ontvangen & ticket sturen'}
+          </button>
+          <div className="flex gap-2">
+            {aanvraag.status === 'nieuw' && (
+              <GhostBtn
+                disabled={bezig}
+                onClick={() =>
+                  actie(() => markeerBetaald({ data: { id: aanvraag.id } }))
+                }
+              >
+                Alleen betaling registreren
+              </GhostBtn>
+            )}
+            <button
+              type="button"
+              disabled={bezig}
+              onClick={() =>
+                actie(() => annuleerTicketaanvraag({ data: aanvraag.id }))
+              }
+              className="flex-1 rounded-full border border-[#E5E7EB] bg-white px-4 py-2 text-[13px] font-semibold text-[#DC2626] hover:border-[#FCA5A5] disabled:opacity-50"
+            >
+              Annuleren
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function Regel({
+  label,
+  waarde,
+  mono,
+  vet,
+  laatste,
+}: {
+  label: string
+  waarde: string | null
+  mono?: boolean
+  vet?: boolean
+  laatste?: boolean
+}) {
+  return (
+    <div
+      className={`flex justify-between gap-3 px-3.5 py-2.5 ${
+        laatste ? '' : 'border-b border-[#F1F5F9]'
+      }`}
+    >
+      <span className="text-[#64748B]">{label}</span>
+      <span
+        className={`truncate ${mono ? 'font-mono text-[12.5px]' : ''} ${
+          vet ? 'font-extrabold' : 'font-semibold'
+        }`}
+      >
+        {waarde || '—'}
+      </span>
+    </div>
   )
 }
 
@@ -1043,7 +1504,7 @@ function UitgifteSectie({
   const [naam, setNaam] = useState('')
   const [telefoon, setTelefoon] = useState('')
   const [email, setEmail] = useState('')
-  const [kanaal, setKanaal] = useState('')
+  const [kanaal, setKanaal] = useState<Verkoopkanaal>('contant')
   const [fout, setFout] = useState<string | null>(null)
   const [laatste, setLaatste] = useState<LeverbaarTicket | null>(null)
   const [bezig, setBezig] = useState(false)
@@ -1061,7 +1522,7 @@ function UitgifteSectie({
           koper_naam: naam,
           koper_telefoon: telefoon || null,
           koper_email: email || null,
-          verkoopkanaal: kanaal || null,
+          verkoopkanaal: kanaal,
         },
       })
       setLaatste({
@@ -1074,7 +1535,7 @@ function UitgifteSectie({
       setNaam('')
       setTelefoon('')
       setEmail('')
-      setKanaal('')
+      setKanaal('contant')
       router.invalidate()
     } catch (err) {
       setFout(err instanceof Error ? err.message : 'Uitgeven mislukt')
@@ -1085,7 +1546,10 @@ function UitgifteSectie({
 
   return (
     <Kaart>
-      <h2 className="mb-4 text-[16px] font-extrabold">Ticket uitgeven</h2>
+      <h2 className="text-[16px] font-extrabold">Direct ticket verkopen</h2>
+      <p className="mb-4 text-[13px] text-[#64748B]">
+        Aan de deur, per telefoon of contant. Het ticket gaat er direct uit.
+      </p>
       {types.length === 0 ? (
         <p className="text-[13.5px] text-[#64748B]">
           Maak eerst een tickettype aan.
@@ -1129,14 +1593,20 @@ function UitgifteSectie({
                 className={inputCls}
               />
             </Veld>
-            <Veld label="Verkoopkanaal">
-              <input
-                value={kanaal}
-                onChange={(e) => setKanaal(e.target.value)}
-                placeholder="whatsapp, contant, …"
-                className={inputCls}
-              />
-            </Veld>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <span className="text-[13px] font-bold">Verkoopkanaal</span>
+            <span className="text-[12.5px] text-[#64748B]">
+              Voor je rapportage achteraf.
+            </span>
+            <ChipGroep
+              opties={VERKOOPKANALEN.map((k) => ({
+                waarde: k,
+                label: VERKOOPKANAAL_LABEL[k],
+              }))}
+              waarde={kanaal}
+              onKies={setKanaal}
+            />
           </div>
           {fout && (
             <p className="text-[14px] font-semibold text-[#DC2626]">{fout}</p>
@@ -1154,7 +1624,7 @@ function UitgifteSectie({
             </div>
           )}
           <PrimaryBtn type="submit" disabled={bezig}>
-            {bezig ? 'Bezig…' : 'Verkocht'}
+            {bezig ? 'Bezig…' : 'Verkoop afronden & ticket sturen'}
           </PrimaryBtn>
         </form>
       )}

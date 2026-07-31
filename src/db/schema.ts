@@ -20,12 +20,32 @@ export const scanResultaat = pgEnum('scan_resultaat', [
   'groen_re_entry',
 ])
 
-// Status van een publieke reservering (fase G): nieuw = nog te verwerken,
-// afgehandeld = ticket uitgegeven, afgewezen = niet gehonoreerd.
+// Status van een ticketaanvraag (heette in fase G "reservering"; de tabel en de
+// enum houden die naam, alleen de UI-taal is gewijzigd — zie Migratieplan §1.3).
+//
+// nieuw       → UI "Wacht op betaling"
+// betaald     → UI "Betaald — klaar om te sturen" (migratie 0012)
+// afgehandeld → UI "Ticket verzonden / Afgerond"
+// afgewezen   → UI "Geannuleerd" (historisch; nieuwe rijen krijgen 'geannuleerd')
+// geannuleerd → expliciet ingetrokken door de organisator (migratie 0012)
+// verlopen    → vervalt_op gepasseerd zonder betaling (migratie 0012)
 export const reserveringStatus = pgEnum('reservering_status', [
   'nieuw',
   'afgehandeld',
   'afgewezen',
+  'betaald',
+  'geannuleerd',
+  'verlopen',
+])
+
+// Hoe een bezoeker betaalt. Bewust een aparte tabel per event in plaats van een
+// enum-array op events: Uni5Pay/Mope kunnen er later bij zonder enum-migratie, en
+// elke methode draagt zijn eigen config (rekeningnummer, telefoonnummer).
+export const betaalmethodeSoort = pgEnum('betaalmethode_soort', [
+  'whatsapp',
+  'bank',
+  'contant',
+  'online',
 ])
 
 // Rol van een gebruiker (fase J). admin = platform-breed overzicht (leest
@@ -170,6 +190,12 @@ export const events = pgTable(
     categorie: eventCategorie('categorie'),
     beschrijving: text('beschrijving'),
     cover_afbeelding_url: text('cover_afbeelding_url'),
+    // Verkoopinstellingen (migratie 0012). verkoop_actief = false → de publieke
+    // eventpagina toont alleen flyer en informatie: geen tickettypes, geen
+    // aanvraagformulier. Default true zodat bestaande events identiek werken.
+    verkoop_actief: boolean('verkoop_actief').notNull().default(true),
+    // Vrije tekst die de bezoeker direct na zijn aanvraag te zien krijgt.
+    betaalinstructies: text('betaalinstructies'),
     aangemaakt_op: timestamp('aangemaakt_op', { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -273,9 +299,37 @@ export const eventFaq = pgTable(
   ],
 )
 
-// Publieke reserveringen (fase G): een bezoeker vraagt een ticket aan zonder
-// account of betaling. De organisator verwerkt het handmatig tot een echt ticket
-// via de bestaande uitgifte. organization_id staat erop (harde regel 3).
+// Betaalmethoden per event (migratie 0012). Bepaalt wat de bezoeker ziet ná zijn
+// aanvraag: een WhatsApp-knop, bankgegevens, of een tekst over contant betalen.
+// `soort = 'online'` is gereserveerd voor Uni5Pay/Mope en wordt nog nergens
+// aangeboden — er is geen online betaling (harde regel 6).
+export const eventBetaalmethoden = pgTable(
+  'event_betaalmethoden',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    event_id: uuid('event_id')
+      .notNull()
+      .references(() => events.id),
+    organization_id: uuid('organization_id')
+      .notNull()
+      .references(() => organizations.id),
+    soort: betaalmethodeSoort('soort').notNull(),
+    // 'uni5pay' | 'mope' | null — alleen gevuld bij soort = 'online'.
+    provider: text('provider'),
+    // Vrije configuratie per methode: telefoonnummer, rekeningnummer, adres.
+    config: text('config'),
+    actief: boolean('actief').notNull().default(true),
+    volgorde: numeric('volgorde').notNull().default('0'),
+  },
+  (t) => [
+    index('event_betaalmethoden_organization_id_idx').on(t.organization_id),
+    index('event_betaalmethoden_event_id_idx').on(t.event_id),
+  ],
+)
+
+// Publieke ticketaanvragen (fase G, toen "reserveringen"): een bezoeker vraagt
+// een ticket aan zonder account. De organisator registreert de betaling en geeft
+// het ticket uit. organization_id staat erop (harde regel 3).
 export const reserveringen = pgTable(
   'reserveringen',
   {
@@ -295,6 +349,13 @@ export const reserveringen = pgTable(
     aantal: numeric('aantal').notNull().default('1'),
     opmerking: text('opmerking'),
     status: reserveringStatus('status').notNull().default('nieuw'),
+    // Betaalspoor (migratie 0012). betaalreferentie is nu een vrij kenmerk voor
+    // bank/WhatsApp; als er ooit een provider bijkomt vult die hier zijn
+    // transactie-id in, zonder tweede tabel.
+    betaald_op: timestamp('betaald_op', { withTimezone: true }),
+    betaalmethode: text('betaalmethode'),
+    betaalreferentie: text('betaalreferentie'),
+    vervalt_op: timestamp('vervalt_op', { withTimezone: true }),
     aangemaakt_op: timestamp('aangemaakt_op', { withTimezone: true })
       .notNull()
       .defaultNow(),

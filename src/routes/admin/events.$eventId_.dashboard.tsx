@@ -7,6 +7,7 @@ import { getPublicBaseUrl } from '#/server/delivery'
 import { formatPrice } from '#/components/discovery/currency'
 import { formatDateLong, formatTimeRange } from '#/lib/datum'
 import { TYPE_KLEUREN } from '#/components/admin/charts'
+import { verkoopkanaalLabel } from '#/lib/verkoopkanaal'
 
 // Event-dashboard: één scherm per event, opgedeeld in de fases vóór / tijdens /
 // na het event. Aparte route naast de beheerpagina (de trailing underscore in
@@ -876,7 +877,7 @@ function KanalenPaneel({ data }: { data: EventDashboardData }) {
                   style={{ background: kleur }}
                 />
                 <span className="w-[96px] flex-none truncate text-[13.5px] font-semibold">
-                  {k.naam}
+                  {verkoopkanaalLabel(k.naam) ?? 'Onbekend'}
                 </span>
                 <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-[#F1F5F9]">
                   <span
@@ -1232,7 +1233,7 @@ function bouwInzichten(data: EventDashboardData, start: Date): Array<string> {
   if (data.kanalen.length > 0 && kanaalTotaal > 0) {
     const top = data.kanalen[0]
     uit.push(
-      `${top.naam} levert ${pct(top.aantal, kanaalTotaal)}% van de uitgegeven tickets.`,
+      `${verkoopkanaalLabel(top.naam) ?? 'Onbekend kanaal'} levert ${pct(top.aantal, kanaalTotaal)}% van de uitgegeven tickets.`,
     )
   }
 

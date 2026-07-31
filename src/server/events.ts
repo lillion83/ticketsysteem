@@ -1,7 +1,13 @@
 import { createServerFn } from '@tanstack/react-start'
 import { and, desc, eq } from 'drizzle-orm'
 import { db } from '#/db/index'
-import { eventCategorie, eventSprekers, events, ticketTypes } from '#/db/schema'
+import {
+  eventBetaalmethoden,
+  eventCategorie,
+  eventSprekers,
+  events,
+  ticketTypes,
+} from '#/db/schema'
 import { requireAuth } from '#/server/session'
 import { requireContentAccess } from '#/server/scope'
 
@@ -9,14 +15,16 @@ type Categorie = (typeof eventCategorie.enumValues)[number]
 
 // Alle functies scopen op organization_id uit de sessie (harde regel 3).
 
-export const listEvents = createServerFn({ method: 'GET' }).handler(async () => {
-  const { organizationId } = await requireAuth()
-  return db
-    .select()
-    .from(events)
-    .where(eq(events.organization_id, organizationId))
-    .orderBy(desc(events.datum_start))
-})
+export const listEvents = createServerFn({ method: 'GET' }).handler(
+  async () => {
+    const { organizationId } = await requireAuth()
+    return db
+      .select()
+      .from(events)
+      .where(eq(events.organization_id, organizationId))
+      .orderBy(desc(events.datum_start))
+  },
+)
 
 export const getEvent = createServerFn({ method: 'GET' })
   .validator((eventId: string) => eventId)
@@ -44,6 +52,11 @@ export type EventInput = {
   categorie: Categorie | null
   beschrijving: string | null
   cover_afbeelding_url: string | null
+  // Verkoopinstellingen (migratie 0012). Optioneel: laat je ze weg, dan blijft de
+  // bestaande waarde staan. verkoop_actief = false → geen ticketmodule op de
+  // publieke pagina.
+  verkoop_actief?: boolean
+  betaalinstructies?: string | null
 }
 
 function parseEventInput(data: EventInput): EventInput {
@@ -54,7 +67,10 @@ function parseEventInput(data: EventInput): EventInput {
   if (new Date(data.datum_eind) < new Date(data.datum_start)) {
     throw new Error('Einddatum ligt vóór de startdatum')
   }
-  if (data.categorie !== null && !eventCategorie.enumValues.includes(data.categorie)) {
+  if (
+    data.categorie !== null &&
+    !eventCategorie.enumValues.includes(data.categorie)
+  ) {
     throw new Error('Ongeldige categorie')
   }
   return data
@@ -96,8 +112,21 @@ export type FullEventInput = {
   locatie: string | null
   cover_afbeelding_url: string | null
   status: 'concept' | 'actief'
-  tiers: Array<{ naam: string; prijs_srd: string; aantal_beschikbaar: string; features: Array<string> }>
+  tiers: Array<{
+    naam: string
+    prijs_srd: string
+    aantal_beschikbaar: string
+    features: Array<string>
+  }>
   sprekers: Array<{ naam: string; rol: string | null }>
+  // Verkoopinstellingen (migratie 0012). Bij verkoop_actief = false worden er
+  // geen tickettypes en geen betaalmethoden aangemaakt.
+  verkoop_actief?: boolean
+  betaalinstructies?: string | null
+  betaalmethoden?: Array<{
+    soort: 'whatsapp' | 'bank' | 'contant'
+    config: string | null
+  }>
 }
 
 function parseFullEventInput(data: FullEventInput): FullEventInput {
@@ -124,7 +153,19 @@ function parseFullEventInput(data: FullEventInput): FullEventInput {
       }
     }
   }
-  return { ...data, tiers, sprekers: data.sprekers.filter((s) => s.naam.trim()) }
+  // verkoop_actief = false → geen ticketmodule, dus ook geen tiers of methoden.
+  const verkoopt = data.verkoop_actief ?? true
+  for (const m of data.betaalmethoden ?? []) {
+    if (!['whatsapp', 'bank', 'contant'].includes(m.soort)) {
+      throw new Error('Onbekende betaalmethode')
+    }
+  }
+  return {
+    ...data,
+    tiers: verkoopt ? tiers : [],
+    betaalmethoden: verkoopt ? (data.betaalmethoden ?? []) : [],
+    sprekers: data.sprekers.filter((s) => s.naam.trim()),
+  }
 }
 
 export const createFullEvent = createServerFn({ method: 'POST' })
@@ -145,8 +186,24 @@ export const createFullEvent = createServerFn({ method: 'POST' })
           categorie: data.categorie,
           beschrijving: data.beschrijving?.trim() || null,
           cover_afbeelding_url: data.cover_afbeelding_url?.trim() || null,
+          verkoop_actief: data.verkoop_actief ?? true,
+          betaalinstructies: data.betaalinstructies?.trim() || null,
         })
         .returning()
+
+      if ((data.betaalmethoden ?? []).length > 0) {
+        await tx.insert(eventBetaalmethoden).values(
+          data.betaalmethoden!.map((m, i) => ({
+            event_id: event.id,
+            organization_id: organizationId,
+            soort: m.soort,
+            provider: null,
+            config: m.config?.trim() || null,
+            actief: true,
+            volgorde: String(i),
+          })),
+        )
+      }
 
       if (data.tiers.length > 0) {
         await tx.insert(ticketTypes).values(
@@ -198,6 +255,12 @@ export const updateEvent = createServerFn({ method: 'POST' })
         categorie: data.categorie,
         beschrijving: data.beschrijving?.trim() || null,
         cover_afbeelding_url: data.cover_afbeelding_url?.trim() || null,
+        ...(data.verkoop_actief === undefined
+          ? {}
+          : { verkoop_actief: data.verkoop_actief }),
+        ...(data.betaalinstructies === undefined
+          ? {}
+          : { betaalinstructies: data.betaalinstructies?.trim() || null }),
       })
       .where(
         and(eq(events.id, data.id), eq(events.organization_id, organizationId)),

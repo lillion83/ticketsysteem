@@ -150,6 +150,43 @@ function escapeHtml(tekst: string): string {
     .replace(/"/g, '&quot;')
 }
 
+/** Verstuurt de ticketmail en markeert het ticket als geleverd. */
+async function mailTicket(
+  ticket: Awaited<ReturnType<typeof ticketVoorLevering>>,
+  organizationId: string,
+) {
+  if (!ticket.koper_email) {
+    throw new Error('Dit ticket heeft geen e-mailadres')
+  }
+
+  const url = ticketUrl(publicBaseUrl(), ticket.code)
+  const png = await qrPng(ticket.code)
+
+  const resultaat = await verstuurMail({
+    naar: ticket.koper_email,
+    naarNaam: ticket.koper_naam,
+    onderwerp: `Je ticket voor ${ticket.event_naam}`,
+    html: mailHtml({
+      koperNaam: ticket.koper_naam,
+      eventNaam: ticket.event_naam,
+      datum: ticket.datum_start,
+      locatie: ticket.locatie,
+      typeNaam: ticket.type_naam,
+      url,
+    }),
+    bijlagen: [{ naam: 'ticket-qr.png', inhoud: png }],
+  })
+
+  if (!resultaat.verzonden) {
+    // Niets verstuurd (geen API-key) → ook niet als geleverd markeren.
+    throw new Error(
+      'Mail niet verstuurd: MAIL_API_KEY of MAIL_AFZENDER_EMAIL ontbreekt in .env',
+    )
+  }
+
+  return markeerGeleverd(ticket.id, organizationId, ticket.geleverd_via, 'mail')
+}
+
 export const sendTicketMail = createServerFn({ method: 'POST' })
   .validator((data: { ticketId: string }) => {
     if (!data.ticketId) throw new Error('ticketId ontbreekt')
@@ -158,42 +195,63 @@ export const sendTicketMail = createServerFn({ method: 'POST' })
   .handler(async ({ data }) => {
     const { organizationId } = await requireAuth()
     const ticket = await ticketVoorLevering(data.ticketId, organizationId)
+    return mailTicket(ticket, organizationId)
+  })
 
-    if (!ticket.koper_email) {
-      throw new Error('Dit ticket heeft geen e-mailadres')
+/**
+ * Levert een hele set tickets in één keer — een ticketaanvraag voor 4 personen
+ * levert 4 tickets op, en de admin heeft daar één knop voor. Dunne lus over
+ * dezelfde bouwstenen als sendTicketMail/markDelivered; per ticket wordt
+ * apart gerapporteerd zodat één ontbrekend e-mailadres de rest niet blokkeert.
+ */
+export const verstuurTickets = createServerFn({ method: 'POST' })
+  .validator(
+    (data: {
+      ticketIds: Array<string>
+      kanaal: string
+    }): { ticketIds: Array<string>; kanaal: Leverkanaal } => {
+      if (data.ticketIds.length === 0) throw new Error('Geen tickets opgegeven')
+      if (data.kanaal !== 'mail' && data.kanaal !== 'whatsapp') {
+        throw new Error('Onbekend leverkanaal')
+      }
+      return { ticketIds: data.ticketIds, kanaal: data.kanaal }
+    },
+  )
+  .handler(async ({ data }) => {
+    const { organizationId } = await requireAuth()
+    const resultaten: Array<{
+      ticketId: string
+      verzonden: boolean
+      fout?: string
+    }> = []
+
+    for (const ticketId of data.ticketIds) {
+      try {
+        const ticket = await ticketVoorLevering(ticketId, organizationId)
+        if (data.kanaal === 'mail') {
+          await mailTicket(ticket, organizationId)
+        } else {
+          await markeerGeleverd(
+            ticket.id,
+            organizationId,
+            ticket.geleverd_via,
+            'whatsapp',
+          )
+        }
+        resultaten.push({ ticketId, verzonden: true })
+      } catch (err) {
+        resultaten.push({
+          ticketId,
+          verzonden: false,
+          fout: err instanceof Error ? err.message : 'Versturen mislukt',
+        })
+      }
     }
 
-    const url = ticketUrl(publicBaseUrl(), ticket.code)
-    const png = await qrPng(ticket.code)
-
-    const resultaat = await verstuurMail({
-      naar: ticket.koper_email,
-      naarNaam: ticket.koper_naam,
-      onderwerp: `Je ticket voor ${ticket.event_naam}`,
-      html: mailHtml({
-        koperNaam: ticket.koper_naam,
-        eventNaam: ticket.event_naam,
-        datum: ticket.datum_start,
-        locatie: ticket.locatie,
-        typeNaam: ticket.type_naam,
-        url,
-      }),
-      bijlagen: [{ naam: 'ticket-qr.png', inhoud: png }],
-    })
-
-    if (!resultaat.verzonden) {
-      // Niets verstuurd (geen API-key) → ook niet als geleverd markeren.
-      throw new Error(
-        'Mail niet verstuurd: MAIL_API_KEY of MAIL_AFZENDER_EMAIL ontbreekt in .env',
-      )
+    return {
+      verzonden: resultaten.filter((r) => r.verzonden).length,
+      mislukt: resultaten.filter((r) => !r.verzonden),
     }
-
-    return markeerGeleverd(
-      ticket.id,
-      organizationId,
-      ticket.geleverd_via,
-      'mail',
-    )
   })
 
 export const markDelivered = createServerFn({ method: 'POST' })
