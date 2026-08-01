@@ -92,6 +92,13 @@
       "when": 1785464889700,
       "tag": "0012_ticketaanvragen",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1785607989150,
+      "tag": "0013_betaling_gemeld",
+      "breakpoints": true
     }
   ]
 }

@@ -35,13 +35,9 @@ import { eventCategories } from '#/components/discovery/data'
 import { CoverUpload } from '#/components/cover-upload'
 import { ticketBericht, whatsappLink } from '#/lib/whatsapp'
 import { kortCode } from '#/lib/scanResult'
-import {
-  VERKOOPKANAAL_LABEL,
-  VERKOOPKANALEN,
-  verkoopkanaalLabel,
-} from '#/lib/verkoopkanaal'
+import { VERKOOPKANAAL_LABEL, VERKOOPKANALEN } from '#/lib/verkoopkanaal'
 import type { Verkoopkanaal } from '#/lib/verkoopkanaal'
-import { betaalKenmerk } from '#/lib/betaalmethoden'
+import { betaalKenmerk, keuzeLabel } from '#/lib/betaalmethoden'
 
 type Categorie = (typeof eventCategories)[number]
 
@@ -882,11 +878,23 @@ function TicketaanvragenSectie() {
                         <div className="truncate text-[14.5px] font-extrabold">
                           {a.naam}
                         </div>
-                        <div className="truncate text-[12.5px] text-[#64748B]">
-                          {a.aantal}× {a.type_naam}
-                          {verkoopkanaalLabel(a.betaalmethode)
-                            ? ` · ${verkoopkanaalLabel(a.betaalmethode)}`
-                            : ''}
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="truncate text-[12.5px] text-[#64748B]">
+                            {a.aantal}× {a.type_naam}
+                          </span>
+                          {/* De gekozen betaalapp staat op de rij, zodat de
+                              organisator niet eerst hoeft te klikken om te zien
+                              waar hij zijn verzoek heen stuurt. */}
+                          {keuzeLabel(a.betaalmethode) && (
+                            <span className="flex-none rounded-full bg-[#DBEAFE] px-2 py-[3px] text-[10.5px] font-extrabold tracking-[0.05em] text-[#2563EB] uppercase">
+                              {keuzeLabel(a.betaalmethode)}
+                            </span>
+                          )}
+                          {a.status === 'nieuw' && a.betaling_gemeld_op && (
+                            <span className="flex-none rounded-full bg-[#DCFCE7] px-2 py-[3px] text-[10.5px] font-extrabold tracking-[0.05em] text-[#16A34A] uppercase">
+                              Betaling gemeld
+                            </span>
+                          )}
                         </div>
                       </div>
                       <StatusBadge status={a.status} />
@@ -1102,11 +1110,12 @@ function AanvraagDetail({
 
       {aanvraag.status === 'nieuw' && (
         <p className="rounded-[12px] border border-[#FDE68A] bg-[#FFFBEB] px-3.5 py-3 text-[13px] leading-relaxed text-[#78350F]">
-          {verkoopkanaalLabel(aanvraag.betaalmethode)
-            ? `Deze bezoeker koos ${verkoopkanaalLabel(aanvraag.betaalmethode)}. `
+          {keuzeLabel(aanvraag.betaalmethode)
+            ? `Deze bezoeker koos ${keuzeLabel(aanvraag.betaalmethode)}. `
             : ''}
-          Zodra het geld binnen is, druk je op de knop hieronder — ticket en QR
-          gaan er meteen uit.
+          {aanvraag.betaling_gemeld_op
+            ? 'Hij meldde zelf dat hij betaald heeft — controleer dat en druk dan op de knop hieronder.'
+            : 'Zodra het geld binnen is, druk je op de knop hieronder — ticket en QR gaan er meteen uit.'}
         </p>
       )}
 

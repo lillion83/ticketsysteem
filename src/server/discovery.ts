@@ -11,7 +11,8 @@ import {
   ticketTypes,
 } from '#/db/schema'
 import { formatDateLine, formatDateLong, formatTimeRange } from '#/lib/datum'
-import type { BetaalmethodeSoort } from '#/lib/betaalmethoden'
+import { leesApps, leesConfig } from '#/lib/betaalmethoden'
+import type { BetaalApp, BetaalmethodeSoort } from '#/lib/betaalmethoden'
 
 // Publieke discovery-lezers (PLAN fase 2). Zelfde bewuste uitzondering op harde
 // regel 3 als src/server/publicTicket.ts: hier is geen sessie en dus geen
@@ -179,8 +180,12 @@ export type PublicEventDetail = {
    * flyer en informatie, en laat het hele ticketblok weg (Migratieplan §1.1).
    */
   verkoopActief: boolean
-  /** Actieve betaalmethoden, in de volgorde die de organisator koos. */
-  betaalmethoden: Array<BetaalmethodeSoort>
+  /**
+   * Actieve betaalmethoden, in de volgorde die de organisator koos. `apps` is
+   * alleen bij WhatsApp gevuld: de betaalapps waarin hij zijn verzoek stuurt.
+   * Leeg = geen app-keuze in het aanvraagformulier.
+   */
+  betaalmethoden: Array<{ soort: BetaalmethodeSoort; apps: Array<BetaalApp> }>
 }
 
 export const getPublicEvent = createServerFn({ method: 'GET' })
@@ -226,7 +231,10 @@ export const getPublicEvent = createServerFn({ method: 'GET' })
           .where(eq(eventFaq.event_id, eventId))
           .orderBy(asc(eventFaq.volgorde)),
         db
-          .select({ soort: eventBetaalmethoden.soort })
+          .select({
+            soort: eventBetaalmethoden.soort,
+            config: eventBetaalmethoden.config,
+          })
           .from(eventBetaalmethoden)
           .where(
             and(
@@ -281,6 +289,9 @@ export const getPublicEvent = createServerFn({ method: 'GET' })
         features: t.features ?? [],
       })),
       verkoopActief: e.verkoop_actief,
-      betaalmethoden: methodeRows.map((m) => m.soort),
+      betaalmethoden: methodeRows.map((m) => ({
+        soort: m.soort,
+        apps: m.soort === 'whatsapp' ? leesApps(leesConfig(m.config)) : [],
+      })),
     }
   })

@@ -11,7 +11,13 @@ import { CoverUpload } from '#/components/cover-upload'
 import { createFullEvent } from '#/server/events'
 import type { FullEventInput } from '#/server/events'
 import { getCurrentUser } from '#/server/session'
-import { METHODE_VELDEN, schrijfConfig } from '#/lib/betaalmethoden'
+import {
+  BETAALAPPS,
+  METHODE_VELDEN,
+  leesApps,
+  schrijfApps,
+  schrijfConfig,
+} from '#/lib/betaalmethoden'
 import type { MethodeConfig } from '#/lib/betaalmethoden'
 
 // Organiseer een Event — 3-staps flow (ontwerp: OrganiseerEvent.dc.html).
@@ -60,7 +66,7 @@ const stepLabels = [
 // 'online' (Uni5Pay/Mope) staat er bewust niet in — zie de uitgeschakelde rij
 // in BetaalmethodenKiezer en harde regel 6.
 const BETAALMETHODEN = [
-  { key: 'whatsapp', label: 'WhatsApp', populair: true },
+  { key: 'whatsapp', label: 'Betaalverzoek via WhatsApp', populair: true },
   { key: 'bank', label: 'Bankoverschrijving', populair: false },
   { key: 'contant', label: 'Contant', populair: false },
 ] as const
@@ -941,9 +947,65 @@ function KeuzeKaart({
 }
 
 /**
- * Welke betaalmethoden de bezoeker straks te zien krijgt. De rij "Uni5Pay &
- * Mope" staat er uitgeschakeld bij: online betalen bestaat niet (harde regel 6),
- * en de lege plek uitleggen werkt beter dan hem verzwijgen.
+ * De betaalapps waarin de organisator zijn verzoek stuurt. Vinkjes en geen vrij
+ * veld: de sleutel belandt in `reserveringen.betaalmethode` als `whatsapp:mope`,
+ * en daar is één schrijfwijze het hele punt.
+ *
+ * Vinkt hij niets aan, dan biedt het aanvraagformulier geen app-keuze en blijft
+ * het een gewoon WhatsApp-verzoek — dat is de bestaande situatie.
+ */
+function AppsKiezer({
+  label,
+  waarde,
+  onChange,
+}: {
+  label: string
+  waarde: string
+  onChange: (waarde: string) => void
+}) {
+  const gekozen = leesApps({ apps: waarde })
+  return (
+    <div>
+      <div className="mb-1 text-[12px] font-bold text-[#64748B]">{label}</div>
+      <div className="flex flex-wrap gap-1.5">
+        {BETAALAPPS.map((app) => {
+          const aan = gekozen.includes(app.key)
+          return (
+            <button
+              key={app.key}
+              type="button"
+              aria-pressed={aan}
+              onClick={() =>
+                onChange(
+                  schrijfApps(
+                    aan
+                      ? gekozen.filter((k) => k !== app.key)
+                      : [...gekozen, app.key],
+                  ),
+                )
+              }
+              className={`rounded-full border px-3 py-1.5 text-[13px] font-bold ${
+                aan
+                  ? 'border-[#2563EB] bg-[#EFF6FF] text-[#2563EB]'
+                  : 'border-[#E5E7EB] bg-white text-[#475569] hover:border-[#93C5FD]'
+              }`}
+            >
+              {aan ? '✓ ' : ''}
+              {app.label}
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Welke betaalmethoden de bezoeker straks te zien krijgt. De rij "Direct online
+ * betalen" staat er uitgeschakeld bij: online betalen bestaat niet (harde regel
+ * 6), en de lege plek uitleggen werkt beter dan hem verzwijgen. Mope en Uni5Pay
+ * staan er wél bij, maar als betaalapp ónder WhatsApp: daar stuurt de
+ * organisator zelf een verzoek in, wij verwerken geen betaling.
  */
 function BetaalmethodenKiezer({
   gekozen,
@@ -996,7 +1058,14 @@ function BetaalmethodenKiezer({
               {aan && METHODE_VELDEN[m.key].length > 0 && (
                 <div className="mt-1.5 ml-8 flex flex-col gap-1.5">
                   {METHODE_VELDEN[m.key].map((v) =>
-                    v.lang ? (
+                    v.apps ? (
+                      <AppsKiezer
+                        key={v.key}
+                        label={v.label}
+                        waarde={config[m.key][v.key] ?? ''}
+                        onChange={(w) => onVeld(m.key, v.key, w)}
+                      />
+                    ) : v.lang ? (
                       <textarea
                         key={v.key}
                         rows={2}
@@ -1025,7 +1094,7 @@ function BetaalmethodenKiezer({
         <div className="flex items-center gap-3 rounded-[12px] border border-dashed border-[#E5E7EB] px-3.5 py-3 opacity-70">
           <span className="h-5 w-5 flex-none rounded-[6px] border-[1.5px] border-[#E2E8F0] bg-[#F8FAFC]" />
           <span className="flex-1 text-[13.5px] font-semibold text-[#94A3B8]">
-            Uni5Pay &amp; Mope
+            Direct online betalen
           </span>
           <span className="text-[11px] font-extrabold text-[#94A3B8]">
             binnenkort

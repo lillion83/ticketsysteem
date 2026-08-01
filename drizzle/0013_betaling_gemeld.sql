@@ -1,0 +1,1 @@
+ALTER TABLE "reserveringen" ADD COLUMN "betaling_gemeld_op" timestamp with time zone;

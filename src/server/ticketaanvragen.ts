@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { createServerFn } from '@tanstack/react-start'
-import { and, desc, eq, inArray, sql } from 'drizzle-orm'
+import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm'
 import { db } from '#/db/index'
 import {
   events,
@@ -16,8 +16,18 @@ import { vindKoperUserId } from '#/server/mijnTickets'
 import { signTicket } from '#/lib/ticketcode'
 import { maakHandmatig } from '#/server/payments/handmatig'
 import { formatDateLong, formatTimeRange } from '#/lib/datum'
-import { betaalKenmerk, leesConfig } from '#/lib/betaalmethoden'
-import type { BetaalmethodeSoort, MethodeConfig } from '#/lib/betaalmethoden'
+import {
+  betaalKenmerk,
+  leesApps,
+  leesConfig,
+  leesKeuze,
+  schrijfKeuze,
+} from '#/lib/betaalmethoden'
+import type {
+  BetaalApp,
+  BetaalmethodeSoort,
+  MethodeConfig,
+} from '#/lib/betaalmethoden'
 
 // Ticketaanvragen (heette in fase G "reserveringen"; de tabel houdt die naam —
 // zie Migratieplan §0). Een bezoeker vraagt publiek een ticket aan, de
@@ -37,6 +47,44 @@ const MAX_AANTAL = 10
 /** Hoe lang een aanvraag geldig blijft zonder betaling. */
 const GELDIG_UREN = 48
 
+/**
+ * De betaalvoorkeur van de bezoeker terugbrengen tot iets dat dit event ook
+ * aanbiedt: `'bank'`, `'contant'`, `'whatsapp'` of `'whatsapp:mope'`. Alles
+ * daarbuiten wordt null.
+ *
+ * Dit is invoervalidatie, geen betaallogica (harde regel 6): we controleren
+ * alleen dát de keuze bestaat, we doen er verder niets mee.
+ */
+async function normaliseerKeuze(
+  eventId: string,
+  ruw: string | null,
+): Promise<string | null> {
+  const { soort, app } = leesKeuze(ruw)
+  if (!soort) return null
+
+  const rows = await db
+    .select({
+      soort: eventBetaalmethoden.soort,
+      config: eventBetaalmethoden.config,
+    })
+    .from(eventBetaalmethoden)
+    .where(
+      and(
+        eq(eventBetaalmethoden.event_id, eventId),
+        eq(eventBetaalmethoden.soort, soort),
+        eq(eventBetaalmethoden.actief, true),
+      ),
+    )
+    .limit(1)
+  if (rows.length === 0) return null
+
+  // De app hoort alleen bij WhatsApp, en alleen als de organisator hem aanzette.
+  if (soort !== 'whatsapp' || !app) return soort
+  return leesApps(leesConfig(rows[0].config)).includes(app)
+    ? schrijfKeuze(soort, app)
+    : soort
+}
+
 export type TicketaanvraagInput = {
   event_id: string
   ticket_type_id: string
@@ -46,8 +94,9 @@ export type TicketaanvraagInput = {
   aantal: number
   opmerking: string | null
   /**
-   * Voorkeur van de bezoeker: 'whatsapp' | 'bank' | 'contant'. Optioneel — de
-   * publieke pagina biedt de keuze pas aan als het event betaalmethoden heeft.
+   * Voorkeur van de bezoeker: 'whatsapp' | 'bank' | 'contant', bij WhatsApp met
+   * de gekozen betaalapp erachter (`'whatsapp:mope'`). Optioneel — de publieke
+   * pagina biedt de keuze pas aan als het event betaalmethoden heeft.
    */
   betaalmethode?: string | null
 }
@@ -86,6 +135,15 @@ export const createTicketaanvraag = createServerFn({ method: 'POST' })
     }
     const organizationId = eventRows[0].organization_id
 
+    // De keuze van de bezoeker is invoer van buiten: alleen een methode die dit
+    // event ook echt aan heeft staan mag de rij in, met alleen een app die de
+    // organisator heeft aangevinkt. Klopt het niet, dan slaan we niets op — een
+    // aanvraag zonder voorkeur is een geldige aanvraag.
+    const betaalmethode = await normaliseerKeuze(
+      data.event_id,
+      data.betaalmethode ?? null,
+    )
+
     const typeRows = await db
       .select({ id: ticketTypes.id })
       .from(ticketTypes)
@@ -111,7 +169,7 @@ export const createTicketaanvraag = createServerFn({ method: 'POST' })
         telefoon: data.telefoon?.trim() || null,
         aantal: String(aantal),
         opmerking: data.opmerking?.trim() || null,
-        betaalmethode: data.betaalmethode?.trim() || null,
+        betaalmethode,
         vervalt_op: vervalt,
       })
       .returning({ id: reserveringen.id })
@@ -150,6 +208,15 @@ export type PubliekeAanvraag = {
     soort: BetaalmethodeSoort
     gegevens: MethodeConfig
   }>
+  /** Wat de bezoeker bij zijn aanvraag koos; null als het event niets aanbood. */
+  gekozenSoort: BetaalmethodeSoort | null
+  /** Bij een betaalverzoek: de app waarin hij het verzoek wil ontvangen. */
+  gekozenApp: BetaalApp | null
+  /**
+   * Wanneer de bezoeker zelf meldde dat hij betaald heeft. De organisator moet
+   * dat nog bevestigen — dit is niet hetzelfde als `status = 'betaald'`.
+   */
+  betalingGemeldOp: string | null
 }
 
 /**
@@ -173,6 +240,8 @@ export const getPubliekeAanvraag = createServerFn({ method: 'GET' })
         naam: reserveringen.naam,
         aantal: reserveringen.aantal,
         vervalt_op: reserveringen.vervalt_op,
+        betaalmethode: reserveringen.betaalmethode,
+        betaling_gemeld_op: reserveringen.betaling_gemeld_op,
         type_naam: ticketTypes.naam,
         prijs_srd: ticketTypes.prijs_srd,
         event_id: events.id,
@@ -212,6 +281,7 @@ export const getPubliekeAanvraag = createServerFn({ method: 'GET' })
 
     const aantal = Math.max(Number(r.aantal), 1)
     const prijsSrd = Number(r.prijs_srd)
+    const keuze = leesKeuze(r.betaalmethode)
 
     // Via de provider-laag (stap 7) in plaats van rechtstreeks uit het event:
     // als hier ooit een echte provider bij komt, is dit de plek waar zijn
@@ -244,7 +314,41 @@ export const getPubliekeAanvraag = createServerFn({ method: 'GET' })
         soort: m.soort,
         gegevens: leesConfig(m.config),
       })),
+      gekozenSoort: keuze.soort,
+      gekozenApp: keuze.app,
+      betalingGemeldOp: r.betaling_gemeld_op
+        ? r.betaling_gemeld_op.toISOString()
+        : null,
     }
+  })
+
+/**
+ * De bezoeker meldt dat hij betaald heeft. Zet alleen een tijdstempel; status,
+ * voorraad en tickets blijven ongemoeid — de organisator bevestigt het geld met
+ * `markeerBetaald`, en dát is wat telt.
+ *
+ * Publiek en zonder sessie, net als `getPubliekeAanvraag`: het aanvraag-uuid is
+ * de sleutel. De WHERE maakt het idempotent — twee keer drukken zet het stempel
+ * niet opnieuw, en een aanvraag die al betaald of afgehandeld is verandert niet
+ * meer.
+ */
+export const meldBetaling = createServerFn({ method: 'POST' })
+  .validator((id: string) => {
+    if (!isUuid(id)) throw new Error('Aanvraag niet gevonden')
+    return id
+  })
+  .handler(async ({ data: id }) => {
+    await db
+      .update(reserveringen)
+      .set({ betaling_gemeld_op: new Date() })
+      .where(
+        and(
+          eq(reserveringen.id, id),
+          eq(reserveringen.status, 'nieuw'),
+          isNull(reserveringen.betaling_gemeld_op),
+        ),
+      )
+    return { ok: true }
   })
 
 // --- Admin (auth-gescoopt) ---
@@ -266,6 +370,7 @@ export const listTicketaanvragen = createServerFn({ method: 'GET' })
         status: reserveringen.status,
         aangemaakt_op: reserveringen.aangemaakt_op,
         betaald_op: reserveringen.betaald_op,
+        betaling_gemeld_op: reserveringen.betaling_gemeld_op,
         betaalmethode: reserveringen.betaalmethode,
         betaalreferentie: reserveringen.betaalreferentie,
         vervalt_op: reserveringen.vervalt_op,

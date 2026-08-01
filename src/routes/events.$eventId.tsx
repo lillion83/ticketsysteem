@@ -12,9 +12,15 @@ import { isFavoriet, toggleFavoriet } from '#/components/discovery/favorites'
 import { getPublicEvent } from '#/server/discovery'
 import type { PublicEventDetail } from '#/server/discovery'
 import { createTicketaanvraag } from '#/server/ticketaanvragen'
-// Labels voor de voorkeurskeuze in het aanvraagformulier — zelfde bron als het
-// eventformulier en de bevestigingspagina.
-import { BETAALMETHODE_LABEL } from '#/lib/betaalmethoden'
+// Labels en uitleg voor de betaalkeuze in het aanvraagformulier — zelfde bron
+// als het eventformulier en de bevestigingspagina.
+import {
+  BETAALMETHODE_LABEL,
+  BETAALMETHODE_UITLEG,
+  betaalAppLabel,
+  schrijfKeuze,
+} from '#/lib/betaalmethoden'
+import type { BetaalmethodeSoort } from '#/lib/betaalmethoden'
 
 // Event-detailpagina (ontwerp: EventDetail.dc.html), gevoed door de database.
 export const Route = createFileRoute('/events/$eventId')({
@@ -29,7 +35,9 @@ export const Route = createFileRoute('/events/$eventId')({
  * eerst een gesprek met de organisator (Migratieplan §4.2).
  */
 function ticketKnopLabel(betaalmethoden: PublicEventDetail['betaalmethoden']) {
-  const kopen = betaalmethoden.some((m) => m === 'bank' || m === 'online')
+  const kopen = betaalmethoden.some(
+    (m) => m.soort === 'bank' || m.soort === 'online',
+  )
   return kopen ? 'Koop ticket' : 'Ticket aanvragen'
 }
 
@@ -77,6 +85,8 @@ function EventDetailPage() {
       {reserveerOpen && (
         <AanvraagModal
           eventId={detail.id}
+          eventTitel={detail.titel}
+          dateLong={detail.dateLong}
           tickets={detail.tickets}
           betaalmethoden={detail.betaalmethoden}
           onClose={() => setReserveerOpen(false)}
@@ -495,21 +505,34 @@ function RailButton({
   )
 }
 
-// Aanvraagformulier. Verstuurt een publieke ticketaanvraag en stuurt de bezoeker
-// door naar zijn bevestigingspagina; daar staat hoe hij betaalt. De organisator
-// registreert de betaling in de admin en stuurt dan het echte ticket.
+/**
+ * Aanvraagformulier — ontwerp "Aanvraag.dc.html", toestand `form`. Verstuurt een
+ * publieke ticketaanvraag en stuurt de bezoeker door naar zijn bevestigingspagina.
+ *
+ * De betaalkeuze staat als radiokaarten in beeld in plaats van in een uitklaplijst,
+ * met de app-keuze (Mope/Uni5Pay) inline ónder het betaalverzoek. Dat scheelt een
+ * scherm en de knop kan beloven wat er echt gebeurt.
+ *
+ * Er wordt hier niets betaald (harde regel 6): dit is een voorkeur die de
+ * organisator in zijn dashboard terugziet.
+ */
 function AanvraagModal({
   eventId,
+  eventTitel,
+  dateLong,
   tickets,
   betaalmethoden,
   onClose,
 }: {
   eventId: string
+  eventTitel: string
+  dateLong: string
   tickets: PublicEventDetail['tickets']
   betaalmethoden: PublicEventDetail['betaalmethoden']
   onClose: () => void
 }) {
   const navigate = useNavigate()
+  const currency = useCurrency()
   const [ticketTypeId, setTicketTypeId] = useState(tickets[0]?.id ?? '')
   const [naam, setNaam] = useState('')
   const [email, setEmail] = useState('')
@@ -517,15 +540,34 @@ function AanvraagModal({
   const [aantal, setAantal] = useState(1)
   const [opmerking, setOpmerking] = useState('')
   // Leeg als het event geen betaalmethoden heeft: dan staat de keuze er niet.
-  const [betaalmethode, setBetaalmethode] = useState<string>(
-    betaalmethoden[0] ?? '',
+  const [soort, setSoort] = useState<BetaalmethodeSoort | ''>(
+    betaalmethoden[0]?.soort ?? '',
   )
+  const [app, setApp] = useState<string>('')
   const [bezig, setBezig] = useState(false)
   const [fout, setFout] = useState<string | null>(null)
+  // Losse veldfouten: het ontwerp kleurt het telefoonveld en zet de app-fout
+  // ónder de appkeuze, niet als één melding bovenaan.
+  const [veldFout, setVeldFout] = useState<'telefoon' | 'app' | null>(null)
+
+  const gekozenType = tickets.find((t) => t.id === ticketTypeId) ?? tickets[0]
+  const apps = betaalmethoden.find((m) => m.soort === soort)?.apps ?? []
+  const appNaam = app ? betaalAppLabel(app) : 'je betaalapp'
 
   async function verstuur(e: React.FormEvent) {
     e.preventDefault()
+    // Een betaalverzoek zonder app is een verzoek dat de organisator nergens
+    // heen kan sturen; het ontwerp blokkeert daarop.
+    if (soort === 'whatsapp' && apps.length > 0 && !app) {
+      setVeldFout('app')
+      return
+    }
+    if (soort === 'whatsapp' && !telefoon.trim()) {
+      setVeldFout('telefoon')
+      return
+    }
     setFout(null)
+    setVeldFout(null)
     setBezig(true)
     try {
       const { id } = await createTicketaanvraag({
@@ -537,7 +579,7 @@ function AanvraagModal({
           telefoon: telefoon || null,
           aantal,
           opmerking: opmerking || null,
-          betaalmethode: betaalmethode || null,
+          betaalmethode: soort ? schrijfKeuze(soort, app) : null,
         },
       })
       navigate({ to: '/aanvraag/$aanvraagId', params: { aanvraagId: id } })
@@ -549,23 +591,28 @@ function AanvraagModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 sm:items-center"
       onClick={onClose}
       role="presentation"
     >
       <div
-        className="w-full max-w-[440px] rounded-[18px] bg-white p-6 shadow-xl"
+        className="w-full max-w-[440px] rounded-[18px] bg-white p-[22px] shadow-xl"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
       >
-        <div className="mb-4 flex items-start justify-between">
-          <h3 className="text-[20px] font-extrabold">
-            {ticketKnopLabel(betaalmethoden)}
-          </h3>
+        <div className="mb-3.5 flex items-start justify-between gap-3">
+          <div>
+            <h3 className="text-[20px] font-extrabold tracking-[-0.01em]">
+              {ticketKnopLabel(betaalmethoden)}
+            </h3>
+            <div className="mt-0.5 text-[13px] text-[#64748B]">
+              {eventTitel} · {dateLong}
+            </div>
+          </div>
           <button
             onClick={onClose}
-            className="text-[#94A3B8] hover:text-[#0F172A]"
+            className="text-[15px] text-[#94A3B8] hover:text-[#0F172A]"
             aria-label="Sluiten"
           >
             ✕
@@ -577,62 +624,184 @@ function AanvraagModal({
           </p>
         ) : (
           <form onSubmit={verstuur} className="flex flex-col gap-3.5">
-            <Veld label="Tickettype">
-              <select
-                value={ticketTypeId}
-                onChange={(e) => setTicketTypeId(e.target.value)}
-                className="w-full rounded-[10px] border border-[#E5E7EB] bg-[#F8FAFC] px-3.5 py-2.5 text-[14px]"
-              >
-                {tickets.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.naam}
-                  </option>
-                ))}
-              </select>
-            </Veld>
-            <Veld label="Aantal">
-              <input
-                type="number"
-                min={1}
-                max={10}
-                value={aantal}
-                onChange={(e) => setAantal(Number(e.target.value))}
-                className="w-full rounded-[10px] border border-[#E5E7EB] bg-[#F8FAFC] px-3.5 py-2.5 text-[14px]"
-              />
-            </Veld>
+            {/* Wat je krijgt en wat het kost, vóór alle velden — zoals in het
+                ontwerp de eerste kaart onder de kop. */}
+            <div className="flex items-center justify-between gap-4 rounded-[14px] border border-[#E5E7EB] px-4 py-3.5">
+              <div className="min-w-0">
+                <div className="truncate text-[14.5px] font-extrabold">
+                  {aantal}× {gekozenType.naam}
+                </div>
+                <div className="mt-0.5 text-[12.5px] text-[#64748B]">
+                  {dateLong}
+                </div>
+              </div>
+              <div className="flex-none text-right">
+                <div className="text-[11px] font-bold text-[#64748B]">
+                  Te betalen
+                </div>
+                <div className="text-[17px] font-extrabold">
+                  {formatPrice(gekozenType.prijsSrd * aantal, currency)}
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-[1fr_92px] gap-2.5">
+              <Veld label="Tickettype">
+                <select
+                  value={ticketTypeId}
+                  onChange={(e) => setTicketTypeId(e.target.value)}
+                  className="w-full rounded-[10px] border border-[#E5E7EB] bg-[#F8FAFC] px-3.5 py-2.5 text-[14px]"
+                >
+                  {tickets.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.naam}
+                    </option>
+                  ))}
+                </select>
+              </Veld>
+              <Veld label="Aantal">
+                <input
+                  type="number"
+                  min={1}
+                  max={10}
+                  value={aantal}
+                  onChange={(e) =>
+                    setAantal(Math.min(Math.max(Number(e.target.value), 1), 10))
+                  }
+                  className="w-full rounded-[10px] border border-[#E5E7EB] bg-[#F8FAFC] px-3.5 py-2.5 text-[14px]"
+                />
+              </Veld>
+            </div>
+
             <Veld label="Naam">
               <ReserveerInput value={naam} onChange={setNaam} required />
             </Veld>
             <Veld label="E-mail">
               <ReserveerInput value={email} onChange={setEmail} type="email" />
             </Veld>
-            <Veld label="Telefoon">
-              <ReserveerInput
-                value={telefoon}
-                onChange={setTelefoon}
-                type="tel"
-              />
-            </Veld>
+
+            {/* WhatsApp-nummer met vaste landcode ervoor. De +597 is beeld, geen
+                waarde: `normaliseerTelefoon` zet een kaal nummer zelf om, en zo
+                kan iemand met een buitenlands nummer nog steeds +31… typen. */}
+            <label className="flex flex-col gap-1">
+              <span className="text-[13px] font-bold">WhatsApp-nummer</span>
+              <div
+                className="flex overflow-hidden rounded-[10px] border bg-[#F8FAFC]"
+                style={{
+                  borderColor: veldFout === 'telefoon' ? '#EF4444' : '#E5E7EB',
+                }}
+              >
+                <span className="flex items-center border-r border-[#E5E7EB] px-3 text-[14px] text-[#64748B]">
+                  +597
+                </span>
+                <input
+                  type="tel"
+                  inputMode="tel"
+                  placeholder="812 4455"
+                  value={telefoon}
+                  onChange={(e) => {
+                    setTelefoon(e.target.value)
+                    if (veldFout === 'telefoon') setVeldFout(null)
+                  }}
+                  aria-describedby="tel-help"
+                  className="min-w-0 flex-1 bg-transparent px-3.5 py-2.5 text-[14px] outline-none"
+                />
+              </div>
+              <span
+                id="tel-help"
+                className="text-[12px] leading-[1.45]"
+                style={{
+                  color: veldFout === 'telefoon' ? '#EF4444' : '#94A3B8',
+                }}
+              >
+                {veldFout === 'telefoon'
+                  ? 'Vul een geldig mobiel nummer in, bijvoorbeeld 812 4455.'
+                  : 'Hierop ontvang je het betaalverzoek en later je e-ticket.'}
+              </span>
+            </label>
             <p className="-mt-1 text-[12px] text-[#94A3B8]">
               Vul minstens een e-mailadres óf telefoonnummer in.
             </p>
+
             {/* Voorkeur, geen betaling: de organisator ziet hem in de admin
                 terug. Alleen tonen als hij methoden heeft aangezet. */}
             {betaalmethoden.length > 0 && (
-              <Veld label="Hoe wil je betalen?">
-                <select
-                  value={betaalmethode}
-                  onChange={(e) => setBetaalmethode(e.target.value)}
-                  className="w-full rounded-[10px] border border-[#E5E7EB] bg-[#F8FAFC] px-3.5 py-2.5 text-[14px]"
-                >
-                  {betaalmethoden.map((m) => (
-                    <option key={m} value={m}>
-                      {BETAALMETHODE_LABEL[m]}
-                    </option>
-                  ))}
-                </select>
-              </Veld>
+              <div
+                className="flex flex-col gap-2"
+                role="radiogroup"
+                aria-label="Hoe wil je betalen?"
+              >
+                <div className="text-[13px] font-bold">Hoe wil je betalen?</div>
+                {betaalmethoden.map((m) => (
+                  <MethodeKaart
+                    key={m.soort}
+                    soort={m.soort}
+                    gekozen={soort === m.soort}
+                    onKies={() => {
+                      setSoort(m.soort)
+                      setVeldFout(null)
+                    }}
+                  >
+                    {/* De app-keuze hoort bij het betaalverzoek en klapt daar
+                        onder open, in plaats van op een eigen scherm. */}
+                    {m.soort === 'whatsapp' &&
+                      soort === 'whatsapp' &&
+                      m.apps.length > 0 && (
+                        <div className="flex flex-col gap-2.5 border-t border-[#F1F5F9] pt-3">
+                          <div className="text-[12.5px] font-bold">
+                            In welke app wil je het verzoek ontvangen?
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            {m.apps.map((a) => (
+                              <button
+                                key={a}
+                                type="button"
+                                role="radio"
+                                aria-checked={app === a}
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  setApp(a)
+                                  setVeldFout(null)
+                                }}
+                                className={`rounded-[12px] border bg-white px-3 py-2.5 text-left ${
+                                  app === a
+                                    ? 'border-[#2563EB] shadow-[0_0_0_3px_rgba(37,99,235,0.12)]'
+                                    : 'border-[#E5E7EB]'
+                                }`}
+                              >
+                                <div className="text-[14px] font-extrabold">
+                                  {betaalAppLabel(a)}
+                                </div>
+                                <div className="text-[11.5px] text-[#64748B]">
+                                  Betaalapp
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+                          <div className="rounded-[10px] bg-[#F8FAFC] px-3 py-2.5 text-[12px] leading-[1.5] text-[#64748B]">
+                            Je betaalt nooit ín WhatsApp. Dat gebruiken we
+                            alleen om je het verzoek te sturen en je op de
+                            hoogte te houden.
+                          </div>
+                          {veldFout === 'app' && (
+                            <div className="text-[12px] font-semibold text-[#EF4444]">
+                              Kies eerst een betaalapp.
+                            </div>
+                          )}
+                        </div>
+                      )}
+                  </MethodeKaart>
+                ))}
+                {/* De lege plek uitleggen werkt beter dan hem verzwijgen. */}
+                <div className="flex items-center gap-2 rounded-[14px] border border-dashed border-[#E5E7EB] px-4 py-3 opacity-60">
+                  <span className="h-[18px] w-[18px] flex-none rounded-full border-2 border-[#E2E8F0]" />
+                  <div className="text-[13.5px] font-bold text-[#94A3B8]">
+                    Direct online betalen — binnenkort
+                  </div>
+                </div>
+              </div>
             )}
+
             <Veld label="Opmerking (optioneel)">
               <textarea
                 value={opmerking}
@@ -647,13 +816,79 @@ function AanvraagModal({
             <button
               type="submit"
               disabled={bezig}
-              className="mt-1 rounded-full bg-[#2563EB] py-3 text-[15px] font-bold text-white hover:bg-[#1D4ED8] disabled:opacity-50"
+              className="mt-1 rounded-full bg-[#2563EB] py-3.5 text-[15px] font-bold text-white hover:bg-[#1D4ED8] disabled:opacity-50"
             >
-              {bezig ? 'Bezig…' : 'Aanvraag versturen'}
+              {bezig ? 'Bezig…' : ctaLabel(soort)}
             </button>
+            <div className="text-center text-[12px] leading-[1.5] text-[#94A3B8]">
+              {soort === 'whatsapp'
+                ? `Je betaalt pas wanneer je het verzoek in ${appNaam} bevestigt.`
+                : 'Je kunt je keuze op de volgende pagina nog wijzigen.'}
+            </div>
           </form>
         )}
       </div>
+    </div>
+  )
+}
+
+/** De knop belooft precies wat er na het versturen gebeurt. */
+function ctaLabel(soort: BetaalmethodeSoort | '') {
+  if (soort === 'whatsapp') return 'Vraag je betaalverzoek aan'
+  if (soort === 'bank') return 'Aanvragen en bankgegevens tonen'
+  return 'Aanvraag versturen'
+}
+
+/** Eén radiokaart in de methodenkiezer, met de uitleg onder de titel. */
+function MethodeKaart({
+  soort,
+  gekozen,
+  onKies,
+  children,
+}: {
+  soort: BetaalmethodeSoort
+  gekozen: boolean
+  onKies: () => void
+  children?: React.ReactNode
+}) {
+  return (
+    <div
+      role="radio"
+      aria-checked={gekozen}
+      tabIndex={0}
+      onClick={onKies}
+      onKeyDown={(e) => {
+        if (e.key === ' ' || e.key === 'Enter') {
+          e.preventDefault()
+          onKies()
+        }
+      }}
+      className="flex cursor-pointer flex-col gap-3 rounded-[14px] border px-4 py-3.5"
+      style={{
+        borderColor: gekozen ? '#2563EB' : '#E5E7EB',
+        background: gekozen ? '#F8FAFF' : '#fff',
+      }}
+    >
+      <div className="flex items-start gap-3">
+        <span
+          className="mt-0.5 flex h-[18px] w-[18px] flex-none items-center justify-center rounded-full border-2"
+          style={{ borderColor: gekozen ? '#2563EB' : '#CBD5E1' }}
+        >
+          <span
+            className="h-2 w-2 rounded-full"
+            style={{ background: gekozen ? '#2563EB' : 'transparent' }}
+          />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="text-[14.5px] font-extrabold">
+            {BETAALMETHODE_LABEL[soort]}
+          </div>
+          <div className="mt-0.5 text-[12.5px] leading-[1.5] text-[#64748B]">
+            {BETAALMETHODE_UITLEG[soort]}
+          </div>
+        </div>
+      </div>
+      {children}
     </div>
   )
 }

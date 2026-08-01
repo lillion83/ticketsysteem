@@ -358,6 +358,11 @@ export const reserveringen = pgTable(
     // bank/WhatsApp; als er ooit een provider bijkomt vult die hier zijn
     // transactie-id in, zonder tweede tabel.
     betaald_op: timestamp('betaald_op', { withTimezone: true }),
+    // De tussenstand uit het ontwerp: de bezoeker heeft gemeld dat hij betaald
+    // heeft, de organisator heeft het nog niet bevestigd. Bewust géén extra
+    // enum-waarde in `status` — dat is de stand die telt voor voorraad en
+    // tickets, en die mag niet vertroebelen door wat de bezoeker zelf zegt.
+    betaling_gemeld_op: timestamp('betaling_gemeld_op', { withTimezone: true }),
     betaalmethode: text('betaalmethode'),
     betaalreferentie: text('betaalreferentie'),
     vervalt_op: timestamp('vervalt_op', { withTimezone: true }),
