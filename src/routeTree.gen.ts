@@ -30,6 +30,7 @@ import { Route as TCodeRouteImport } from './routes/t.$code'
 import { Route as UploadsBestandRouteImport } from './routes/uploads.$bestand'
 import { Route as AdminEventsIndexRouteImport } from './routes/admin/events.index'
 import { Route as AdminEventsEventIdRouteImport } from './routes/admin/events.$eventId'
+import { Route as AdminEventsNewRouteImport } from './routes/admin/events.new'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as EventsEventIdLiveRouteImport } from './routes/events.$eventId_.live'
 import { Route as PlatformEventsIndexRouteImport } from './routes/platform/events.index'
@@ -143,6 +144,11 @@ const AdminEventsEventIdRoute = AdminEventsEventIdRouteImport.update({
   path: '/events/$eventId',
   getParentRoute: () => AdminRouteRoute,
 } as any)
+const AdminEventsNewRoute = AdminEventsNewRouteImport.update({
+  id: '/events/new',
+  path: '/events/new',
+  getParentRoute: () => AdminRouteRoute,
+} as any)
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   id: '/api/auth/$',
   path: '/api/auth/$',
@@ -201,6 +207,7 @@ export interface FileRoutesByFullPath {
   '/events/': typeof EventsIndexRoute
   '/platform/': typeof PlatformIndexRoute
   '/admin/events/$eventId': typeof AdminEventsEventIdRoute
+  '/admin/events/new': typeof AdminEventsNewRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/events/$eventId/live': typeof EventsEventIdLiveRoute
   '/platform/events/$eventId': typeof PlatformEventsEventIdRoute
@@ -229,6 +236,7 @@ export interface FileRoutesByTo {
   '/events': typeof EventsIndexRoute
   '/platform': typeof PlatformIndexRoute
   '/admin/events/$eventId': typeof AdminEventsEventIdRoute
+  '/admin/events/new': typeof AdminEventsNewRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/events/$eventId/live': typeof EventsEventIdLiveRoute
   '/platform/events/$eventId': typeof PlatformEventsEventIdRoute
@@ -260,6 +268,7 @@ export interface FileRoutesById {
   '/events/': typeof EventsIndexRoute
   '/platform/': typeof PlatformIndexRoute
   '/admin/events/$eventId': typeof AdminEventsEventIdRoute
+  '/admin/events/new': typeof AdminEventsNewRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/events/$eventId_/live': typeof EventsEventIdLiveRoute
   '/platform/events/$eventId': typeof PlatformEventsEventIdRoute
@@ -292,6 +301,7 @@ export interface FileRouteTypes {
     | '/events/'
     | '/platform/'
     | '/admin/events/$eventId'
+    | '/admin/events/new'
     | '/api/auth/$'
     | '/events/$eventId/live'
     | '/platform/events/$eventId'
@@ -320,6 +330,7 @@ export interface FileRouteTypes {
     | '/events'
     | '/platform'
     | '/admin/events/$eventId'
+    | '/admin/events/new'
     | '/api/auth/$'
     | '/events/$eventId/live'
     | '/platform/events/$eventId'
@@ -350,6 +361,7 @@ export interface FileRouteTypes {
     | '/events/'
     | '/platform/'
     | '/admin/events/$eventId'
+    | '/admin/events/new'
     | '/api/auth/$'
     | '/events/$eventId_/live'
     | '/platform/events/$eventId'
@@ -531,6 +543,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminEventsEventIdRouteImport
       parentRoute: typeof AdminRouteRoute
     }
+    '/admin/events/new': {
+      id: '/admin/events/new'
+      path: '/events/new'
+      fullPath: '/admin/events/new'
+      preLoaderRoute: typeof AdminEventsNewRouteImport
+      parentRoute: typeof AdminRouteRoute
+    }
     '/api/auth/$': {
       id: '/api/auth/$'
       path: '/api/auth/$'
@@ -586,6 +605,7 @@ declare module '@tanstack/react-router' {
 interface AdminRouteRouteChildren {
   AdminIndexRoute: typeof AdminIndexRoute
   AdminEventsEventIdRoute: typeof AdminEventsEventIdRoute
+  AdminEventsNewRoute: typeof AdminEventsNewRoute
   AdminEventsIndexRoute: typeof AdminEventsIndexRoute
   AdminEventsEventIdDashboardRoute: typeof AdminEventsEventIdDashboardRoute
   AdminEventsEventIdDeurRoute: typeof AdminEventsEventIdDeurRoute
@@ -594,6 +614,7 @@ interface AdminRouteRouteChildren {
 const AdminRouteRouteChildren: AdminRouteRouteChildren = {
   AdminIndexRoute: AdminIndexRoute,
   AdminEventsEventIdRoute: AdminEventsEventIdRoute,
+  AdminEventsNewRoute: AdminEventsNewRoute,
   AdminEventsIndexRoute: AdminEventsIndexRoute,
   AdminEventsEventIdDashboardRoute: AdminEventsEventIdDashboardRoute,
   AdminEventsEventIdDeurRoute: AdminEventsEventIdDeurRoute,

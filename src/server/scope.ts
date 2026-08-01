@@ -6,14 +6,22 @@ import { db } from '#/db/index'
 import { events } from '#/db/schema'
 import { auth } from '#/lib/auth'
 
-export type SessieRol = { userId: string; rol: string; organizationId: string | null }
+export type SessieRol = {
+  userId: string
+  rol: string
+  organizationId: string | null
+}
 
 /** Ingelogde gebruiker + rol, zonder org-eis. Server-only. */
 export const sessieRol = createServerOnlyFn(async (): Promise<SessieRol> => {
   const session = await auth.api.getSession({ headers: getRequest().headers })
   if (!session?.user) throw new Error('Niet ingelogd')
   const u = session.user as { organizationId?: string; rol?: string }
-  return { userId: session.user.id, rol: u.rol ?? 'koper', organizationId: u.organizationId ?? null }
+  return {
+    userId: session.user.id,
+    rol: u.rol ?? 'koper',
+    organizationId: u.organizationId ?? null,
+  }
 })
 
 /**
@@ -23,6 +31,19 @@ export const sessieRol = createServerOnlyFn(async (): Promise<SessieRol> => {
 export function orgWhere(column: Column, ctx: SessieRol): SQL | undefined {
   if (ctx.rol === 'admin') return undefined
   return eq(column, ctx.organizationId ?? '')
+}
+
+/**
+ * Route-params komen rechtstreeks uit de URL en gaan hier ongewijzigd een
+ * uuid-kolom in. Postgres weigert dan de hele query ("invalid input syntax for
+ * type uuid") in plaats van niets te vinden, en die fout kwam als kale SQL in de
+ * browser terecht. Vandaar: eerst vormcontrole, dan pas de database.
+ */
+const UUID_PATROON =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+export function isUuid(waarde: string): boolean {
+  return UUID_PATROON.test(waarde)
 }
 
 /**
@@ -36,10 +57,17 @@ export function orgWhere(column: Column, ctx: SessieRol): SQL | undefined {
  * — bewust NIET naar tickets uitgeven, scannen of reserveringen. Server-only.
  */
 export const requireContentAccess = createServerOnlyFn(
-  async (eventId: string): Promise<{ userId: string; organizationId: string }> => {
+  async (
+    eventId: string,
+  ): Promise<{ userId: string; organizationId: string }> => {
     const session = await auth.api.getSession({ headers: getRequest().headers })
     if (!session?.user) throw new Error('Niet ingelogd')
     const u = session.user as { organizationId?: string; rol?: string }
+
+    // Een id dat geen uuid is, hoort bij geen enkel event. Zelfde melding als een
+    // bestaand-maar-onvindbaar event: een fout pad mag niet verklappen of iets
+    // wel of niet bestaat.
+    if (!isUuid(eventId)) throw new Error('Event niet gevonden')
 
     const rows = await db
       .select({ org: events.organization_id })

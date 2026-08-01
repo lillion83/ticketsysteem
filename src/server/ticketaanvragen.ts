@@ -11,6 +11,7 @@ import {
   tickets,
 } from '#/db/schema'
 import { requireAuth } from '#/server/session'
+import { isUuid } from '#/server/scope'
 import { vindKoperUserId } from '#/server/mijnTickets'
 import { signTicket } from '#/lib/ticketcode'
 import { maakHandmatig } from '#/server/payments/handmatig'
@@ -252,6 +253,8 @@ export const listTicketaanvragen = createServerFn({ method: 'GET' })
   .validator((eventId: string) => eventId)
   .handler(async ({ data: eventId }) => {
     const { organizationId } = await requireAuth()
+    // Zie listTickets: een niet-uuid laat Postgres de query weigeren.
+    if (!isUuid(eventId)) return []
     return db
       .select({
         id: reserveringen.id,

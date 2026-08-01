@@ -4,6 +4,7 @@ import { and, desc, eq, ilike, or, sql } from 'drizzle-orm'
 import { db } from '#/db/index'
 import { ticketTypes, tickets } from '#/db/schema'
 import { requireAuth } from '#/server/session'
+import { isUuid } from '#/server/scope'
 import { vindKoperUserId } from '#/server/mijnTickets'
 import { signTicket } from '#/lib/ticketcode'
 
@@ -98,6 +99,9 @@ export const listTickets = createServerFn({ method: 'GET' })
   .validator((data: { eventId: string; zoek?: string }) => data)
   .handler(async ({ data }) => {
     const { organizationId } = await requireAuth()
+    // Geen uuid = geen event = geen tickets. Zonder deze afslag weigert Postgres
+    // de query op de uuid-kolom in plaats van niets te vinden.
+    if (!isUuid(data.eventId)) return []
 
     const filters = [
       eq(tickets.event_id, data.eventId),
