@@ -14,8 +14,22 @@ export type IssueTicketInput = {
   koper_telefoon: string | null
   koper_email: string | null
   verkoopkanaal: string | null
+  /** Aantal tickets in één handeling. Weggelaten = 1 (het oude gedrag). */
+  aantal?: number
 }
 
+/** Zelfde bovengrens als een publieke ticketaanvraag. */
+const MAX_AANTAL = 10
+
+/**
+ * Directe verkoop aan de deur of per telefoon. Geeft `aantal` tickets in één
+ * transactie uit — het ontwerp (D5) heeft een aantal-stepper, en een lus over
+ * losse aanroepen zou halverwege kunnen stranden met de voorraad al opgehoogd.
+ *
+ * De voorraadbewaking is dezelfde als in `genereerTicketsIntern`: één UPDATE die
+ * de teller met `n` ophoogt en tegelijk bewaakt dat hij binnen de capaciteit
+ * blijft. Geen rij terug = niet genoeg voorraad.
+ */
 export const issueTicket = createServerFn({ method: 'POST' })
   .validator((data: IssueTicketInput) => {
     if (!data.event_id || !data.ticket_type_id) {
@@ -26,19 +40,25 @@ export const issueTicket = createServerFn({ method: 'POST' })
   })
   .handler(async ({ data }) => {
     const { userId, organizationId } = await requireAuth()
+    const aantal = Math.min(
+      Math.max(Math.floor(data.aantal ?? 1) || 1, 1),
+      MAX_AANTAL,
+    )
 
     return db.transaction(async (tx) => {
       // Voorraad atomair ophogen én bewaken: geen rij terug = uitverkocht
       // (of verkeerde org/event). Nooit eerst lezen en dan schrijven.
       const typeRows = await tx
         .update(ticketTypes)
-        .set({ aantal_verkocht: sql`${ticketTypes.aantal_verkocht} + 1` })
+        .set({
+          aantal_verkocht: sql`${ticketTypes.aantal_verkocht} + ${aantal}`,
+        })
         .where(
           and(
             eq(ticketTypes.id, data.ticket_type_id),
             eq(ticketTypes.event_id, data.event_id),
             eq(ticketTypes.organization_id, organizationId),
-            sql`${ticketTypes.aantal_verkocht} < ${ticketTypes.aantal_beschikbaar}`,
+            sql`${ticketTypes.aantal_verkocht} + ${aantal} <= ${ticketTypes.aantal_beschikbaar}`,
           ),
         )
         .returning()
@@ -46,23 +66,20 @@ export const issueTicket = createServerFn({ method: 'POST' })
         throw new Error('Uitverkocht of tickettype niet gevonden')
       }
 
-      // Ticket-id app-side, zodat code én id in één insert vastliggen
-      // (geen SELECT-na-INSERT). Code = {uuid}.{hmac} (harde regel 1).
-      const ticketId = randomUUID()
-      const code = signTicket(data.event_id, ticketId)
-
       // Koppel meteen aan een bestaand koper-account (fase K) als dat er is.
       const koperEmail = data.koper_email?.trim() || null
       const koperUserId = koperEmail ? await vindKoperUserId(koperEmail) : null
 
-      const ticketRows = await tx
-        .insert(tickets)
-        .values({
+      // Ticket-id app-side, zodat code én id in één insert vastliggen
+      // (geen SELECT-na-INSERT). Code = {uuid}.{hmac} (harde regel 1).
+      const nieuwe = Array.from({ length: aantal }, () => {
+        const ticketId = randomUUID()
+        return {
           id: ticketId,
           event_id: data.event_id,
           ticket_type_id: data.ticket_type_id,
           organization_id: organizationId,
-          code,
+          code: signTicket(data.event_id, ticketId),
           koper_naam: data.koper_naam.trim(),
           koper_telefoon: data.koper_telefoon?.trim() || null,
           koper_email: koperEmail,
@@ -70,9 +87,10 @@ export const issueTicket = createServerFn({ method: 'POST' })
           verkocht_op: new Date(),
           verkocht_door_user_id: userId,
           verkoopkanaal: data.verkoopkanaal?.trim() || null,
-        })
-        .returning()
-      return ticketRows[0]
+        }
+      })
+
+      return tx.insert(tickets).values(nieuwe).returning()
     })
   })
 

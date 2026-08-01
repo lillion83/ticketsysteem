@@ -203,20 +203,16 @@ function ChipGroep<T extends string>({
 }
 
 function EventDetail() {
-  const { event, types } = Route.useLoaderData()
-
   return (
     <div className="flex flex-col gap-6">
       <EventSectie />
+      {/* Direct verkopen zit als dialog in deze sectie (ontwerp D4/D5), niet
+          meer als een eigen kaart onderaan de pagina. */}
       <TicketaanvragenSectie />
       <TicketTypesSectie />
       <SprekersSectie />
       <AgendaSectie />
       <FaqSectie />
-      <UitgifteSectie
-        eventId={event.id}
-        types={types.map((t) => ({ id: t.id, naam: t.naam }))}
-      />
       <VerkooplijstSectie />
     </div>
   )
@@ -737,12 +733,21 @@ function TicketaanvragenSectie() {
   const [openId, setOpenId] = useState<string | null>(null)
   const [selectie, setSelectie] = useState<Array<string>>([])
   const [bulkOpen, setBulkOpen] = useState(false)
+  const [verkoopOpen, setVerkoopOpen] = useState(false)
   const [fout, setFout] = useState<string | null>(null)
   const [bezig, setBezig] = useState(false)
 
   const wacht = ticketaanvragen.filter((a) => a.status === 'nieuw')
   const betaald = ticketaanvragen.filter((a) => a.status === 'betaald')
   const afgerond = ticketaanvragen.filter((a) => a.status === 'afgehandeld')
+
+  // Indicatie, geen boekhouding (harde regel 6): som van de aanvragen waarvan de
+  // betaling gemeld is. Wat er daadwerkelijk op de rekening staat, weet dit
+  // systeem niet — het registreert alleen dat de organisator op de knop drukte.
+  const ontvangenSrd = [...betaald, ...afgerond].reduce(
+    (som, a) => som + Number(a.prijs_srd) * Math.max(Number(a.aantal), 1),
+    0,
+  )
 
   const lijst =
     tab === 'nieuw' ? wacht : tab === 'betaald' ? betaald : ticketaanvragen
@@ -786,9 +791,14 @@ function TicketaanvragenSectie() {
             </span>
           )}
         </h2>
+        <PrimaryBtn size="sm" onClick={() => setVerkoopOpen(true)}>
+          Direct ticket verkopen
+        </PrimaryBtn>
       </div>
 
-      <div className="mb-4 grid grid-cols-3 gap-2.5">
+      {verkoopOpen && <VerkoopDialoog onClose={() => setVerkoopOpen(false)} />}
+
+      <div className="mb-4 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
         <Tegel
           waarde={wacht.length}
           label="Wacht op betaling"
@@ -800,6 +810,11 @@ function TicketaanvragenSectie() {
           kleur="#2563EB"
         />
         <Tegel waarde={afgerond.length} label="Afgerond" kleur="#16A34A" />
+        <Tegel
+          waarde={`SRD ${ontvangenSrd.toLocaleString('nl-NL')}`}
+          label="Ontvangen"
+          kleur="#0F172A"
+        />
       </div>
 
       <div className="mb-3 flex gap-5 border-b border-[#E5E7EB]">
@@ -946,7 +961,7 @@ function Tegel({
   label,
   kleur,
 }: {
-  waarde: number
+  waarde: number | string
   label: string
   kleur: string
 }) {
@@ -1501,50 +1516,63 @@ function LeverKnoppen({ ticket }: { ticket: LeverbaarTicket }) {
   )
 }
 
-function UitgifteSectie({
-  eventId,
-  types,
-}: {
-  eventId: string
-  types: Array<{ id: string; naam: string }>
-}) {
+/**
+ * Direct verkopen aan de deur of per telefoon — ontwerp D5: een dialog boven het
+ * beheerscherm, met keuzekaarten per tickettype, een stepper voor het aantal en
+ * één contactveld. Aan de deur typ je maar één ding in; of dat een e-mailadres
+ * of een telefoonnummer is, leiden we af aan de @.
+ */
+function VerkoopDialoog({ onClose }: { onClose: () => void }) {
+  const { event, types } = Route.useLoaderData()
   const router = useRouter()
   const [typeId, setTypeId] = useState(types[0]?.id ?? '')
+  const [aantal, setAantal] = useState(1)
   const [naam, setNaam] = useState('')
-  const [telefoon, setTelefoon] = useState('')
-  const [email, setEmail] = useState('')
+  const [contact, setContact] = useState('')
   const [kanaal, setKanaal] = useState<Verkoopkanaal>('contant')
   const [fout, setFout] = useState<string | null>(null)
-  const [laatste, setLaatste] = useState<LeverbaarTicket | null>(null)
+  const [verkocht, setVerkocht] = useState<Array<LeverbaarTicket> | null>(null)
   const [bezig, setBezig] = useState(false)
+
+  const gekozen = types.find((t) => t.id === typeId) ?? null
+  const rest = gekozen
+    ? Number(gekozen.aantal_beschikbaar) - Number(gekozen.aantal_verkocht)
+    : 0
+  // Nooit meer aanbieden dan er is; de server bewaakt het nog een keer atomair.
+  const maxAantal = Math.max(1, Math.min(MAX_DIRECT, rest))
+  const totaal = gekozen ? Number(gekozen.prijs_srd) * aantal : 0
+
+  function kiesType(id: string) {
+    setTypeId(id)
+    setAantal(1)
+  }
 
   async function verkopen(e: React.FormEvent) {
     e.preventDefault()
     setFout(null)
-    setLaatste(null)
     setBezig(true)
     try {
-      const ticket = await issueTicket({
+      const nieuwe = await issueTicket({
         data: {
-          event_id: eventId,
+          event_id: event.id,
           ticket_type_id: typeId,
           koper_naam: naam,
-          koper_telefoon: telefoon || null,
-          koper_email: email || null,
+          // Eén veld, twee kolommen: met een @ is het een e-mailadres.
+          koper_telefoon: contact.includes('@') ? null : contact || null,
+          koper_email: contact.includes('@') ? contact : null,
           verkoopkanaal: kanaal,
+          aantal,
         },
       })
-      setLaatste({
-        id: ticket.id,
-        code: ticket.code,
-        koper_naam: ticket.koper_naam,
-        koper_telefoon: ticket.koper_telefoon,
-        koper_email: ticket.koper_email,
-      })
-      setNaam('')
-      setTelefoon('')
-      setEmail('')
-      setKanaal('contant')
+      setVerkocht(
+        nieuwe.map((t) => ({
+          id: t.id,
+          code: t.code,
+          koper_naam: t.koper_naam,
+          koper_telefoon: t.koper_telefoon,
+          koper_email: t.koper_email,
+        })),
+      )
       router.invalidate()
     } catch (err) {
       setFout(err instanceof Error ? err.message : 'Uitgeven mislukt')
@@ -1554,19 +1582,105 @@ function UitgifteSectie({
   }
 
   return (
-    <Kaart>
-      <h2 className="text-[16px] font-extrabold">Direct ticket verkopen</h2>
-      <p className="mb-4 text-[13px] text-[#64748B]">
-        Aan de deur, per telefoon of contant. Het ticket gaat er direct uit.
-      </p>
-      {types.length === 0 ? (
-        <p className="text-[13.5px] text-[#64748B]">
-          Maak eerst een tickettype aan.
-        </p>
-      ) : (
-        <form onSubmit={verkopen} className="grid gap-4">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Veld label="Kopersnaam">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      onClick={onClose}
+      role="presentation"
+    >
+      <div
+        className="max-h-full w-full max-w-[520px] overflow-y-auto rounded-[18px] bg-white p-6 shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+      >
+        <div className="mb-4 flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-[18px] font-extrabold">
+              Direct ticket verkopen
+            </h2>
+            <p className="mt-0.5 text-[13px] text-[#64748B]">
+              Aan de deur, per telefoon of contant. Het ticket gaat er direct
+              uit.
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-[#94A3B8] hover:text-[#0F172A]"
+            aria-label="Sluiten"
+          >
+            ✕
+          </button>
+        </div>
+
+        {types.length === 0 ? (
+          <p className="text-[13.5px] text-[#64748B]">
+            Maak eerst een tickettype aan.
+          </p>
+        ) : verkocht ? (
+          <VerkoopKlaar tickets={verkocht} onSluiten={onClose} />
+        ) : (
+          <form onSubmit={verkopen} className="flex flex-col gap-4">
+            <div className="flex flex-col gap-1.5">
+              <span className="text-[13px] font-bold">Welk ticket?</span>
+              <div className="flex flex-col gap-2">
+                {types.map((t) => {
+                  const over =
+                    Number(t.aantal_beschikbaar) - Number(t.aantal_verkocht)
+                  const aan = t.id === typeId
+                  return (
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() => kiesType(t.id)}
+                      aria-pressed={aan}
+                      disabled={over <= 0}
+                      className={`flex items-center justify-between gap-3 rounded-[12px] border-[1.5px] px-3.5 py-3 text-left disabled:opacity-50 ${
+                        aan
+                          ? 'border-[#2563EB] bg-[#EFF6FF]'
+                          : 'border-[#E5E7EB] bg-white hover:border-[#93C5FD]'
+                      }`}
+                    >
+                      <span>
+                        <span className="block text-[14.5px] font-extrabold">
+                          {t.naam}
+                        </span>
+                        <span className="block text-[12.5px] text-[#64748B]">
+                          {over > 0 ? `${over} over` : 'uitverkocht'}
+                        </span>
+                      </span>
+                      <span className="text-[14.5px] font-extrabold text-[#2563EB]">
+                        SRD {Number(t.prijs_srd).toLocaleString('nl-NL')}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between gap-4">
+              <span className="text-[13px] font-bold">Aantal</span>
+              <div className="flex items-center gap-3">
+                <StepKnop
+                  onClick={() => setAantal((a) => Math.max(1, a - 1))}
+                  disabled={aantal <= 1}
+                  label="Eén minder"
+                >
+                  −
+                </StepKnop>
+                <span className="w-8 text-center text-[16px] font-extrabold tabular-nums">
+                  {aantal}
+                </span>
+                <StepKnop
+                  onClick={() => setAantal((a) => Math.min(maxAantal, a + 1))}
+                  disabled={aantal >= maxAantal}
+                  label="Eén meer"
+                >
+                  +
+                </StepKnop>
+              </div>
+            </div>
+
+            <Veld label="Naam koper">
               <input
                 required
                 value={naam}
@@ -1574,70 +1688,115 @@ function UitgifteSectie({
                 className={inputCls}
               />
             </Veld>
-            <Veld label="Tickettype">
-              <select
-                value={typeId}
-                onChange={(e) => setTypeId(e.target.value)}
-                className={inputCls}
-              >
-                {types.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.naam}
-                  </option>
-                ))}
-              </select>
-            </Veld>
-            <Veld label="Telefoon">
+            <Veld label="Telefoon of e-mail">
               <input
-                value={telefoon}
-                onChange={(e) => setTelefoon(e.target.value)}
+                value={contact}
+                onChange={(e) => setContact(e.target.value)}
+                placeholder="+597 812 4455 of naam@mail.com"
                 className={inputCls}
               />
             </Veld>
-            <Veld label="E-mail">
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className={inputCls}
-              />
-            </Veld>
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <span className="text-[13px] font-bold">Verkoopkanaal</span>
-            <span className="text-[12.5px] text-[#64748B]">
-              Voor je rapportage achteraf.
-            </span>
-            <ChipGroep
-              opties={VERKOOPKANALEN.map((k) => ({
-                waarde: k,
-                label: VERKOOPKANAAL_LABEL[k],
-              }))}
-              waarde={kanaal}
-              onKies={setKanaal}
-            />
-          </div>
-          {fout && (
-            <p className="text-[14px] font-semibold text-[#DC2626]">{fout}</p>
-          )}
-          {laatste && (
-            <div className="flex flex-wrap items-center gap-3 rounded-[12px] bg-[#DCFCE7] px-3.5 py-2.5 text-[13.5px] text-[#166534]">
-              <span>
-                Ticket uitgegeven voor {laatste.koper_naam} (code{' '}
-                <span className="font-mono font-semibold tracking-wider">
-                  {kortCode(laatste.code)}
-                </span>
-                ). Versturen:
+
+            <div className="flex flex-col gap-1.5">
+              <span className="text-[13px] font-bold">Verkoopkanaal</span>
+              <span className="text-[12.5px] text-[#64748B]">
+                Vaste keuzes in plaats van een vrij veld — anders is je
+                rapportage waardeloos.
               </span>
-              <LeverKnoppen ticket={laatste} />
+              <ChipGroep
+                opties={VERKOOPKANALEN.map((k) => ({
+                  waarde: k,
+                  label: VERKOOPKANAAL_LABEL[k],
+                }))}
+                waarde={kanaal}
+                onKies={setKanaal}
+              />
             </div>
-          )}
-          <PrimaryBtn type="submit" disabled={bezig}>
-            {bezig ? 'Bezig…' : 'Verkoop afronden & ticket sturen'}
-          </PrimaryBtn>
-        </form>
-      )}
-    </Kaart>
+
+            {fout && (
+              <p className="text-[14px] font-semibold text-[#DC2626]">{fout}</p>
+            )}
+
+            <div className="flex items-center justify-between border-t border-[#F1F5F9] pt-3.5">
+              <span className="text-[14px] font-bold">Totaal</span>
+              <span className="text-[20px] font-extrabold">
+                SRD {totaal.toLocaleString('nl-NL')}
+              </span>
+            </div>
+
+            <div className="flex gap-2.5">
+              <GhostBtn onClick={onClose}>Annuleren</GhostBtn>
+              <PrimaryBtn type="submit" disabled={bezig || rest <= 0}>
+                {bezig ? 'Bezig…' : 'Verkoop afronden & ticket sturen'}
+              </PrimaryBtn>
+            </div>
+          </form>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/** Zelfde bovengrens als de server hanteert. */
+const MAX_DIRECT = 10
+
+function StepKnop({
+  children,
+  onClick,
+  disabled,
+  label,
+}: {
+  children: ReactNode
+  onClick: () => void
+  disabled?: boolean
+  label: string
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={label}
+      className="flex h-9 w-9 items-center justify-center rounded-full border border-[#E5E7EB] text-[18px] font-extrabold text-[#0F172A] hover:border-[#93C5FD] disabled:opacity-40"
+    >
+      {children}
+    </button>
+  )
+}
+
+/**
+ * Na de verkoop: de codes en per ticket de leverknoppen. Het ontwerp laat de
+ * dialog hier sluiten, maar het versturen zat al aan deze plek vast en dat is te
+ * handig om weg te halen — je staat aan de deur en wilt het ticket meteen sturen.
+ */
+function VerkoopKlaar({
+  tickets,
+  onSluiten,
+}: {
+  tickets: Array<LeverbaarTicket>
+  onSluiten: () => void
+}) {
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="rounded-[12px] bg-[#DCFCE7] px-3.5 py-2.5 text-[13.5px] font-semibold text-[#166534]">
+        {tickets.length === 1
+          ? 'Ticket uitgegeven'
+          : `${tickets.length} tickets uitgegeven`}{' '}
+        voor {tickets[0].koper_naam}.
+      </div>
+      {tickets.map((t) => (
+        <div
+          key={t.id}
+          className="flex flex-wrap items-center gap-3 rounded-[12px] border border-[#E5E7EB] px-3.5 py-2.5 text-[13.5px]"
+        >
+          <span className="font-mono font-semibold tracking-wider">
+            {kortCode(t.code)}
+          </span>
+          <LeverKnoppen ticket={t} />
+        </div>
+      ))}
+      <PrimaryBtn onClick={onSluiten}>Klaar</PrimaryBtn>
+    </div>
   )
 }
 

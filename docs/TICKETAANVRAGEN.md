@@ -225,6 +225,31 @@ verkoopkanaal `'reservering'`.
 taak die de status omzet. Dat vraagt een cron of een check bij het lezen — een
 eigen beslissing, geen opruimwerk.
 
+## Direct ticket verkopen (ontwerp D5)
+
+Van een kaart onderaan het beheerscherm naar een **dialog**, geopend met de knop
+naast "Ticketaanvragen" (ontwerp D4). Met keuzekaarten per tickettype die tonen
+wat er nog over is, een −/+ stepper voor het aantal, één veld "Telefoon of
+e-mail" — met een `@` erin is het een e-mailadres, anders een telefoonnummer — en
+een Totaal-regel boven de knop.
+
+`issueTicket` gaf één ticket per aanroep uit en accepteert nu een `aantal`
+(weggelaten = 1, het oude gedrag). Bewust géén lus over losse aanroepen: die kan
+halverwege stranden met de voorraad al opgehoogd. De voorraadbewaking is nu
+dezelfde als in `genereerTicketsIntern` — één UPDATE die de teller met `n`
+ophoogt en tegelijk bewaakt dat hij binnen de capaciteit blijft, geen rij terug is
+niet genoeg voorraad. De stepper biedt nooit meer aan dan er over is; de server
+controleert het daarna alsnog.
+
+Na de verkoop toont de dialog de codes met de leverknoppen erbij. Het ontwerp
+sluit hier af, maar dat versturen zat al aan deze plek vast en is te handig om
+weg te halen: je staat aan de deur en wilt het ticket meteen sturen.
+
+De vierde tegel uit D4 staat er ook: **Ontvangen** in SRD, de som van de
+aanvragen waarvan de betaling gemeld is. Een indicatie, geen boekhouding — het
+systeem weet niet wat er op de rekening staat, alleen dat er op de knop gedrukt
+is.
+
 ## "Event staat online" (ontwerp D3)
 
 Na publiceren komt de organisator op **`/events/$eventId/live`** in plaats van op
