@@ -31,6 +31,7 @@ import { Route as UploadsBestandRouteImport } from './routes/uploads.$bestand'
 import { Route as AdminEventsIndexRouteImport } from './routes/admin/events.index'
 import { Route as AdminEventsEventIdRouteImport } from './routes/admin/events.$eventId'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
+import { Route as EventsEventIdLiveRouteImport } from './routes/events.$eventId_.live'
 import { Route as PlatformEventsIndexRouteImport } from './routes/platform/events.index'
 import { Route as PlatformEventsEventIdRouteImport } from './routes/platform/events.$eventId'
 import { Route as TCodeQrRouteImport } from './routes/t.$code_.qr'
@@ -147,6 +148,11 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   path: '/api/auth/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const EventsEventIdLiveRoute = EventsEventIdLiveRouteImport.update({
+  id: '/events/$eventId_/live',
+  path: '/events/$eventId/live',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PlatformEventsIndexRoute = PlatformEventsIndexRouteImport.update({
   id: '/events/',
   path: '/events/',
@@ -196,6 +202,7 @@ export interface FileRoutesByFullPath {
   '/platform/': typeof PlatformIndexRoute
   '/admin/events/$eventId': typeof AdminEventsEventIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/events/$eventId/live': typeof EventsEventIdLiveRoute
   '/platform/events/$eventId': typeof PlatformEventsEventIdRoute
   '/t/$code/qr': typeof TCodeQrRoute
   '/admin/events/': typeof AdminEventsIndexRoute
@@ -223,6 +230,7 @@ export interface FileRoutesByTo {
   '/platform': typeof PlatformIndexRoute
   '/admin/events/$eventId': typeof AdminEventsEventIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/events/$eventId/live': typeof EventsEventIdLiveRoute
   '/platform/events/$eventId': typeof PlatformEventsEventIdRoute
   '/t/$code/qr': typeof TCodeQrRoute
   '/admin/events': typeof AdminEventsIndexRoute
@@ -253,6 +261,7 @@ export interface FileRoutesById {
   '/platform/': typeof PlatformIndexRoute
   '/admin/events/$eventId': typeof AdminEventsEventIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/events/$eventId_/live': typeof EventsEventIdLiveRoute
   '/platform/events/$eventId': typeof PlatformEventsEventIdRoute
   '/t/$code_/qr': typeof TCodeQrRoute
   '/admin/events/': typeof AdminEventsIndexRoute
@@ -284,6 +293,7 @@ export interface FileRouteTypes {
     | '/platform/'
     | '/admin/events/$eventId'
     | '/api/auth/$'
+    | '/events/$eventId/live'
     | '/platform/events/$eventId'
     | '/t/$code/qr'
     | '/admin/events/'
@@ -311,6 +321,7 @@ export interface FileRouteTypes {
     | '/platform'
     | '/admin/events/$eventId'
     | '/api/auth/$'
+    | '/events/$eventId/live'
     | '/platform/events/$eventId'
     | '/t/$code/qr'
     | '/admin/events'
@@ -340,6 +351,7 @@ export interface FileRouteTypes {
     | '/platform/'
     | '/admin/events/$eventId'
     | '/api/auth/$'
+    | '/events/$eventId_/live'
     | '/platform/events/$eventId'
     | '/t/$code_/qr'
     | '/admin/events/'
@@ -366,6 +378,7 @@ export interface RootRouteChildren {
   UploadsBestandRoute: typeof UploadsBestandRoute
   EventsIndexRoute: typeof EventsIndexRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
+  EventsEventIdLiveRoute: typeof EventsEventIdLiveRoute
   TCodeQrRoute: typeof TCodeQrRoute
 }
 
@@ -525,6 +538,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/events/$eventId_/live': {
+      id: '/events/$eventId_/live'
+      path: '/events/$eventId/live'
+      fullPath: '/events/$eventId/live'
+      preLoaderRoute: typeof EventsEventIdLiveRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/platform/events/': {
       id: '/platform/events/'
       path: '/events'
@@ -629,6 +649,7 @@ const rootRouteChildren: RootRouteChildren = {
   UploadsBestandRoute: UploadsBestandRoute,
   EventsIndexRoute: EventsIndexRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
+  EventsEventIdLiveRoute: EventsEventIdLiveRoute,
   TCodeQrRoute: TCodeQrRoute,
 }
 export const routeTree = rootRouteImport

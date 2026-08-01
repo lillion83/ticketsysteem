@@ -225,6 +225,30 @@ verkoopkanaal `'reservering'`.
 taak die de status omzet. Dat vraagt een cron of een check bij het lezen — een
 eigen beslissing, geen opruimwerk.
 
+## "Event staat online" (ontwerp D3)
+
+Na publiceren komt de organisator op **`/events/$eventId/live`** in plaats van op
+zijn eigen publieke pagina: LIVE-badge, de URL, Deel op WhatsApp en Kopieer link,
+en de checklist "Maak je pagina sterker". Bewust buiten `/admin` — die route
+rendert een zijbalk, en het ontwerp is een scherm op volle breedte.
+
+De checklist is **afgeleid**, geen tabel met afvinkbare taken: beschrijving,
+line-up, tweede tickettype, programma en flyer zijn af omdat het veld gevuld is.
+Dat kan niet uit de pas lopen en vraagt geen migratie. Elk item linkt naar het
+beheerscherm, waar de editors al staan.
+
+Drie dingen uit het ontwerp zijn bewust anders:
+
+- **Geen verzonnen cijfers.** Het ontwerp zette percentages bij de checklist
+  ("Events met beschrijving verkopen 34% meer") en een claim van "2,4× zoveel
+  tickets" bij het delen. Daar is geen bron voor en het gaat naar echte
+  organisatoren, dus de winstregels zijn feitelijk herschreven. Het aantal events
+  van deze week wordt wél echt geteld.
+- **Paginaweergaven tonen een streepje.** Bezoekersstatistieken worden niet
+  bijgehouden; een `0` zou als meting lezen.
+- **Geen QR-poster.** Die knop uit het ontwerp vraagt eigen werk (posterformaat,
+  eventcode) en staat er nog niet.
+
 ## Wat expliciet niet gebeurt
 
 - Geen rename van de tabel `reserveringen`.

@@ -219,10 +219,11 @@ function OrganiseerEvent() {
     setBezig(true)
     try {
       const res = await createFullEvent({ data: payload })
-      // Gepubliceerd → naar de publieke detailpagina; concept → naar admin om
-      // verder te bewerken (concepten zijn niet publiek zichtbaar).
+      // Gepubliceerd → naar het "staat online"-scherm met de deelknoppen en de
+      // checklist (ontwerp D3); concept → naar admin om verder te bewerken
+      // (concepten zijn niet publiek zichtbaar).
       if (res.status === 'actief') {
-        navigate({ to: '/events/$eventId', params: { eventId: res.id } })
+        navigate({ to: '/events/$eventId/live', params: { eventId: res.id } })
       } else {
         navigate({ to: '/admin/events/$eventId', params: { eventId: res.id } })
       }
