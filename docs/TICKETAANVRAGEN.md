@@ -37,7 +37,7 @@ Interne namen (de tabel `reserveringen`, het type `Leverkanaal`) blijven staan.
 | 3   | Serverlaag splitsen (`ticketaanvragen.ts`)         | ✅             |
 | 4   | Admin-UI: tabs, badges, detailpaneel               | ✅             |
 | 5   | Eventformulier: promokaart, ja/nee, betaalmethoden | ✅             |
-| 6   | Publieke pagina + bevestigingspagina bezoeker      | openstaand     |
+| 6   | Publieke pagina + bevestigingspagina bezoeker      | ✅             |
 | 7   | `payments/`-map met alleen de handmatige provider  | ✅ (vervroegd) |
 | 8   | Opruimen: re-exports weg, `afgewezen` uitfaseren   | openstaand     |
 
@@ -120,6 +120,37 @@ kenmerken en vroegboekkorting zitten achter `<details>` "Meer opties".
 Het formulier schrijft `verkoop_actief`, `betaalinstructies` en rijen in
 `event_betaalmethoden`. `soort = 'online'` biedt het niet aan: die rij staat
 uitgeschakeld in beeld als "Uni5Pay & Mope — binnenkort".
+
+## 6. Publieke pagina + bevestigingspagina
+
+`getPublicEvent` levert er twee velden bij: `verkoopActief` en `betaalmethoden`.
+Bij `verkoopActief === false` verdwijnen op `events.$eventId.tsx` zowel het
+ticketblok als de prijs en de knop in de rechter rail — flyer en informatie
+blijven staan.
+
+De knop heet **Koop ticket** zodra de bezoeker zelf een bedrag kan overmaken
+(bank, en straks online), en **Ticket aanvragen** als het bij WhatsApp of contant
+blijft; dan begint het met een gesprek. Eén helper, `ticketKnopLabel`.
+
+Het formulier heeft een extra veld "Hoe wil je betalen?" — een voorkeur, geen
+betaling. Het verschijnt alleen als de organisator methoden heeft aangezet, en
+landt in `reserveringen.betaalmethode`.
+
+Na verzenden geen inline "bedankt" meer: `createTicketaanvraag` geeft het id
+terug en de bezoeker gaat naar **`/aanvraag/$aanvraagId`**. Dat uuid is de
+sleutel, zoals de ticketcode dat is in `t.$code`; `getPubliekeAanvraag` is
+daarom publiek en org-loos, met dezelfde uitzondering op harde regel 3 als
+`publicTicket.ts`. Die functie geeft bewust **niet** het e-mailadres, telefoon-
+nummer, de opmerking of de betaalreferentie terug — de link is deelbaar.
+
+De pagina toont status, samenvatting, totaalbedrag en een blok per actieve
+betaalmethode. WhatsApp wordt een groene knop via `whatsappLink()` op
+`organizations.telefoon`; staat daar niets, dan valt hij terug op de
+instructietekst. Bank en contant verwijzen naar diezelfde tekst — het
+eventformulier schrijft nog geen `config` per methode, dus rekeningnummers staan
+in `betaalinstructies`. De tekst komt via `maakHandmatig(...).start()` uit de
+provider-laag, niet rechtstreeks uit het event: daar geeft een echte provider
+later een redirect terug.
 
 ## 7. `payments/` — aansluiting, geen betaling
 

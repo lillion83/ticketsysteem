@@ -16,6 +16,7 @@ import { Route as MijnTicketRouteImport } from './routes/mijn-ticket'
 import { Route as PlatformRouteRouteImport } from './routes/platform/route'
 import { Route as ProfielRouteImport } from './routes/profiel'
 import { Route as WordOrganisatorRouteImport } from './routes/word-organisator'
+import { Route as AanvraagAanvraagIdRouteImport } from './routes/aanvraag.$aanvraagId'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as ApiCoverRouteImport } from './routes/api/cover'
 import { Route as EventsIndexRouteImport } from './routes/events.index'
@@ -69,6 +70,11 @@ const ProfielRoute = ProfielRouteImport.update({
 const WordOrganisatorRoute = WordOrganisatorRouteImport.update({
   id: '/word-organisator',
   path: '/word-organisator',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AanvraagAanvraagIdRoute = AanvraagAanvraagIdRouteImport.update({
+  id: '/aanvraag/$aanvraagId',
+  path: '/aanvraag/$aanvraagId',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminIndexRoute = AdminIndexRouteImport.update({
@@ -176,6 +182,7 @@ export interface FileRoutesByFullPath {
   '/mijn-ticket': typeof MijnTicketRouteWithChildren
   '/profiel': typeof ProfielRoute
   '/word-organisator': typeof WordOrganisatorRoute
+  '/aanvraag/$aanvraagId': typeof AanvraagAanvraagIdRoute
   '/api/cover': typeof ApiCoverRoute
   '/events/$eventId': typeof EventsEventIdRoute
   '/events/new': typeof EventsNewRoute
@@ -202,6 +209,7 @@ export interface FileRoutesByTo {
   '/mijn-ticket': typeof MijnTicketRouteWithChildren
   '/profiel': typeof ProfielRoute
   '/word-organisator': typeof WordOrganisatorRoute
+  '/aanvraag/$aanvraagId': typeof AanvraagAanvraagIdRoute
   '/api/cover': typeof ApiCoverRoute
   '/events/$eventId': typeof EventsEventIdRoute
   '/events/new': typeof EventsNewRoute
@@ -231,6 +239,7 @@ export interface FileRoutesById {
   '/mijn-ticket': typeof MijnTicketRouteWithChildren
   '/profiel': typeof ProfielRoute
   '/word-organisator': typeof WordOrganisatorRoute
+  '/aanvraag/$aanvraagId': typeof AanvraagAanvraagIdRoute
   '/api/cover': typeof ApiCoverRoute
   '/events/$eventId': typeof EventsEventIdRoute
   '/events/new': typeof EventsNewRoute
@@ -261,6 +270,7 @@ export interface FileRouteTypes {
     | '/mijn-ticket'
     | '/profiel'
     | '/word-organisator'
+    | '/aanvraag/$aanvraagId'
     | '/api/cover'
     | '/events/$eventId'
     | '/events/new'
@@ -287,6 +297,7 @@ export interface FileRouteTypes {
     | '/mijn-ticket'
     | '/profiel'
     | '/word-organisator'
+    | '/aanvraag/$aanvraagId'
     | '/api/cover'
     | '/events/$eventId'
     | '/events/new'
@@ -315,6 +326,7 @@ export interface FileRouteTypes {
     | '/mijn-ticket'
     | '/profiel'
     | '/word-organisator'
+    | '/aanvraag/$aanvraagId'
     | '/api/cover'
     | '/events/$eventId'
     | '/events/new'
@@ -344,6 +356,7 @@ export interface RootRouteChildren {
   MijnTicketRoute: typeof MijnTicketRouteWithChildren
   ProfielRoute: typeof ProfielRoute
   WordOrganisatorRoute: typeof WordOrganisatorRoute
+  AanvraagAanvraagIdRoute: typeof AanvraagAanvraagIdRoute
   ApiCoverRoute: typeof ApiCoverRoute
   EventsEventIdRoute: typeof EventsEventIdRoute
   EventsNewRoute: typeof EventsNewRoute
@@ -405,6 +418,13 @@ declare module '@tanstack/react-router' {
       path: '/word-organisator'
       fullPath: '/word-organisator'
       preLoaderRoute: typeof WordOrganisatorRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/aanvraag/$aanvraagId': {
+      id: '/aanvraag/$aanvraagId'
+      path: '/aanvraag/$aanvraagId'
+      fullPath: '/aanvraag/$aanvraagId'
+      preLoaderRoute: typeof AanvraagAanvraagIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/': {
@@ -599,6 +619,7 @@ const rootRouteChildren: RootRouteChildren = {
   MijnTicketRoute: MijnTicketRouteWithChildren,
   ProfielRoute: ProfielRoute,
   WordOrganisatorRoute: WordOrganisatorRoute,
+  AanvraagAanvraagIdRoute: AanvraagAanvraagIdRoute,
   ApiCoverRoute: ApiCoverRoute,
   EventsEventIdRoute: EventsEventIdRoute,
   EventsNewRoute: EventsNewRoute,

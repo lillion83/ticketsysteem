@@ -1,11 +1,17 @@
-import { createFileRoute, Link } from '@tanstack/react-router'
+import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
-import { EventBanner, SiteFooter, SiteNav, SitePage, stripe } from '#/components/discovery/site'
+import {
+  EventBanner,
+  SiteFooter,
+  SiteNav,
+  SitePage,
+  stripe,
+} from '#/components/discovery/site'
 import { formatPrice, useCurrency } from '#/components/discovery/currency'
 import { isFavoriet, toggleFavoriet } from '#/components/discovery/favorites'
 import { getPublicEvent } from '#/server/discovery'
 import type { PublicEventDetail } from '#/server/discovery'
-import { createReservering } from '#/server/reserveringen'
+import { createTicketaanvraag } from '#/server/ticketaanvragen'
 
 // Event-detailpagina (ontwerp: EventDetail.dc.html), gevoed door de database.
 export const Route = createFileRoute('/events/$eventId')({
@@ -13,6 +19,25 @@ export const Route = createFileRoute('/events/$eventId')({
   component: EventDetailPage,
   errorComponent: NietGevonden,
 })
+
+/**
+ * "Koop ticket" zodra de bezoeker zelf een bedrag kan overmaken (bank of straks
+ * online), "Ticket aanvragen" als het bij WhatsApp of contant blijft: dan is het
+ * eerst een gesprek met de organisator (Migratieplan §4.2).
+ */
+function ticketKnopLabel(betaalmethoden: PublicEventDetail['betaalmethoden']) {
+  const kopen = betaalmethoden.some((m) => m === 'bank' || m === 'online')
+  return kopen ? 'Koop ticket' : 'Ticket aanvragen'
+}
+
+// Labels voor de voorkeurskeuze in het aanvraagformulier. Alleen de methoden die
+// de organisator heeft aangezet, in zijn volgorde.
+const BETAALMETHODE_LABEL: Record<string, string> = {
+  whatsapp: 'WhatsApp',
+  bank: 'Bankoverschrijving',
+  contant: 'Contant',
+  online: 'Online betalen',
+}
 
 // Accent-paletje voor de agenda-tijdlijn (puur visueel, cyclet per item).
 const agendaAccenten: Array<[string, string]> = [
@@ -56,7 +81,12 @@ function EventDetailPage() {
     <SitePage>
       <SiteNav active="events" />
       {reserveerOpen && (
-        <ReserveerModal eventId={detail.id} titel={detail.titel} tickets={detail.tickets} onClose={() => setReserveerOpen(false)} />
+        <AanvraagModal
+          eventId={detail.id}
+          tickets={detail.tickets}
+          betaalmethoden={detail.betaalmethoden}
+          onClose={() => setReserveerOpen(false)}
+        />
       )}
 
       <div className="mx-auto max-w-[1280px] px-6 pb-20 pt-8 md:px-12">
@@ -68,8 +98,12 @@ function EventDetailPage() {
         >
           <div className="absolute inset-0 bg-[linear-gradient(transparent_40%,rgba(0,0,0,0.75))]" />
           <div className="absolute bottom-7 left-8 text-white">
-            <h1 className="mb-2 text-[30px] font-extrabold md:text-[38px]">{detail.titel}</h1>
-            <div className="text-[15px] font-semibold">{detail.dateLocationLine}</div>
+            <h1 className="mb-2 text-[30px] font-extrabold md:text-[38px]">
+              {detail.titel}
+            </h1>
+            <div className="text-[15px] font-semibold">
+              {detail.dateLocationLine}
+            </div>
           </div>
         </EventBanner>
 
@@ -78,9 +112,14 @@ function EventDetailPage() {
           <div>
             {detail.paragrafen.length > 0 && (
               <Card>
-                <h2 className="mb-4 text-[22px] font-extrabold">Over dit Event</h2>
+                <h2 className="mb-4 text-[22px] font-extrabold">
+                  Over dit Event
+                </h2>
                 {detail.paragrafen.map((p, i) => (
-                  <p key={i} className="mb-3.5 text-[14.5px] leading-[1.7] text-[#334155] last:mb-0">
+                  <p
+                    key={i}
+                    className="mb-3.5 text-[14.5px] leading-[1.7] text-[#334155] last:mb-0"
+                  >
                     {p}
                   </p>
                 ))}
@@ -89,7 +128,9 @@ function EventDetailPage() {
 
             {detail.sprekers.length > 0 && (
               <Card>
-                <h2 className="mb-5 text-[22px] font-extrabold">Sprekers/Line-up</h2>
+                <h2 className="mb-5 text-[22px] font-extrabold">
+                  Sprekers/Line-up
+                </h2>
                 <div className="grid grid-cols-2 gap-5 sm:grid-cols-4">
                   {detail.sprekers.map((s) => (
                     <div key={s.id} className="text-center">
@@ -97,12 +138,20 @@ function EventDetailPage() {
                         className="mx-auto mb-2.5 h-[76px] w-[76px] rounded-full"
                         style={
                           s.avatarUrl
-                            ? { backgroundImage: `url(${s.avatarUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' }
+                            ? {
+                                backgroundImage: `url(${s.avatarUrl})`,
+                                backgroundSize: 'cover',
+                                backgroundPosition: 'center',
+                              }
                             : stripe('#F1F5F9', '#E2E8F0')
                         }
                       />
                       <div className="text-[14px] font-extrabold">{s.naam}</div>
-                      {s.rol && <div className="text-[12.5px] text-[#64748B]">{s.rol}</div>}
+                      {s.rol && (
+                        <div className="text-[12.5px] text-[#64748B]">
+                          {s.rol}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -115,7 +164,8 @@ function EventDetailPage() {
                 <div className="flex flex-col">
                   {detail.agenda.map((a, i) => {
                     const hasLine = i < detail.agenda.length - 1
-                    const [accent, dotBg] = agendaAccenten[i % agendaAccenten.length]
+                    const [accent, dotBg] =
+                      agendaAccenten[i % agendaAccenten.length]
                     return (
                       <div key={a.id} className="flex gap-4">
                         <div className="flex flex-col items-center">
@@ -123,23 +173,40 @@ function EventDetailPage() {
                             className="flex h-[34px] w-[34px] flex-none items-center justify-center rounded-full"
                             style={{ background: dotBg }}
                           >
-                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={accent} strokeWidth="2">
+                            <svg
+                              width="15"
+                              height="15"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke={accent}
+                              strokeWidth="2"
+                            >
                               <rect x="9" y="2" width="6" height="12" rx="3" />
                               <path d="M5 10v1a7 7 0 0 0 14 0v-1M12 18v4" />
                             </svg>
                           </div>
-                          {hasLine && <div className="min-h-[24px] w-0.5 flex-1 bg-[#E5E7EB]" />}
+                          {hasLine && (
+                            <div className="min-h-[24px] w-0.5 flex-1 bg-[#E5E7EB]" />
+                          )}
                         </div>
                         <div className="mb-4 flex-1 rounded-[14px] border border-[#E5E7EB] p-[16px_18px]">
                           <div className="mb-1.5 flex items-start justify-between">
-                            <div className="text-[15px] font-extrabold">{a.titel}</div>
+                            <div className="text-[15px] font-extrabold">
+                              {a.titel}
+                            </div>
                             <span className="whitespace-nowrap rounded-full bg-[#DBEAFE] px-2.5 py-[3px] text-[12px] font-bold text-[#2563EB]">
                               {a.tijd}
                             </span>
                           </div>
-                          {a.subtitel && <div className="mb-2 text-[13px] text-[#64748B]">{a.subtitel}</div>}
+                          {a.subtitel && (
+                            <div className="mb-2 text-[13px] text-[#64748B]">
+                              {a.subtitel}
+                            </div>
+                          )}
                           {a.beschrijving && (
-                            <div className="text-[13.5px] leading-[1.6] text-[#334155]">{a.beschrijving}</div>
+                            <div className="text-[13.5px] leading-[1.6] text-[#334155]">
+                              {a.beschrijving}
+                            </div>
                           )}
                         </div>
                       </div>
@@ -149,14 +216,21 @@ function EventDetailPage() {
               </Card>
             )}
 
-            {detail.tickets.length > 0 && (
+            {/* Verkoopt de organisator niet via het platform, dan blijft het
+                hele ticketblok weg — flyer en informatie zijn dan de pagina. */}
+            {detail.verkoopActief && detail.tickets.length > 0 && (
               <Card last>
                 <h2 className="mb-5 text-[22px] font-extrabold">Tickets</h2>
                 <div className="flex flex-col gap-4">
                   {detail.tickets.map((t) => (
-                    <div key={t.id} className="rounded-[14px] border border-[#E5E7EB] p-[18px]">
+                    <div
+                      key={t.id}
+                      className="rounded-[14px] border border-[#E5E7EB] p-[18px]"
+                    >
                       <div className="mb-2 flex items-start justify-between gap-4">
-                        <div className="text-[16px] font-extrabold">{t.naam}</div>
+                        <div className="text-[16px] font-extrabold">
+                          {t.naam}
+                        </div>
                         <div className="whitespace-nowrap text-[16px] font-extrabold text-[#2563EB]">
                           {formatPrice(t.prijsSrd, currency)}
                         </div>
@@ -164,7 +238,10 @@ function EventDetailPage() {
                       {t.features.length > 0 && (
                         <ul className="flex flex-col gap-1.5">
                           {t.features.map((f, i) => (
-                            <li key={i} className="flex items-center gap-2 text-[13.5px] text-[#334155]">
+                            <li
+                              key={i}
+                              className="flex items-center gap-2 text-[13.5px] text-[#334155]"
+                            >
                               <svg
                                 width="14"
                                 height="14"
@@ -194,14 +271,28 @@ function EventDetailPage() {
               <h3 className="mb-4 text-[18px] font-extrabold">Event Detail</h3>
               <div className="mb-4.5 flex flex-col gap-3.5">
                 <DetailRow>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2">
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#2563EB"
+                    strokeWidth="2"
+                  >
                     <rect x="3" y="4" width="18" height="18" rx="2" />
                     <path d="M16 2v4M8 2v4M3 10h18" />
                   </svg>
                   {detail.dateLong}
                 </DetailRow>
                 <DetailRow>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2">
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#2563EB"
+                    strokeWidth="2"
+                  >
                     <circle cx="12" cy="12" r="9" />
                     <path d="M12 7v5l3 3" />
                   </svg>
@@ -209,7 +300,14 @@ function EventDetailPage() {
                 </DetailRow>
                 {detail.locatie && (
                   <DetailRow>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2">
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="#2563EB"
+                      strokeWidth="2"
+                    >
                       <path d="M12 21s-7-6.4-7-11a7 7 0 0 1 14 0c0 4.6-7 11-7 11Z" />
                       <circle cx="12" cy="10" r="2.5" />
                     </svg>
@@ -227,23 +325,36 @@ function EventDetailPage() {
                   Bekijk op Kaart
                 </a>
               )}
-              <div className="relative mb-5 h-[120px] rounded-[12px]" style={stripe('#F0FDF4', '#DCFCE7')}>
+              <div
+                className="relative mb-5 h-[120px] rounded-[12px]"
+                style={stripe('#F0FDF4', '#DCFCE7')}
+              >
                 <div className="absolute left-1/2 top-1/2 h-6 w-6 -translate-x-1/2 -translate-y-1/2 rounded-full border-[3px] border-white bg-[#2563EB] shadow-[0_2px_6px_rgba(0,0,0,0.3)]" />
               </div>
-              <div className="mb-0.5 text-[13px] text-[#64748B]">Vanaf</div>
-              <div className="mb-4 text-[22px] font-extrabold text-[#2563EB]">
-                {detail.prijsVanafSrd === null ? 'Gratis' : formatPrice(detail.prijsVanafSrd, currency)}
-              </div>
-              {/* Registreer Nu → opent het reserveringsformulier (fase G). De
-                  organisator verwerkt de aanvraag in de admin tot een echt ticket. */}
-              <button
-                onClick={() => setReserveerOpen(true)}
-                className="mb-3 block w-full rounded-full bg-[#2563EB] py-3.5 text-center text-[15px] font-bold text-white hover:bg-[#1D4ED8]"
-              >
-                Registreer Nu →
-              </button>
+              {/* Zonder verkoop via het platform geen prijs en geen knop: de
+                  bezoeker regelt zijn ticket buiten de site om. */}
+              {detail.verkoopActief && (
+                <>
+                  <div className="mb-0.5 text-[13px] text-[#64748B]">Vanaf</div>
+                  <div className="mb-4 text-[22px] font-extrabold text-[#2563EB]">
+                    {detail.prijsVanafSrd === null
+                      ? 'Gratis'
+                      : formatPrice(detail.prijsVanafSrd, currency)}
+                  </div>
+                  {/* Opent het aanvraagformulier. De organisator registreert de
+                      betaling in de admin en stuurt daarna het ticket. */}
+                  <button
+                    onClick={() => setReserveerOpen(true)}
+                    className="mb-3 block w-full rounded-full bg-[#2563EB] py-3.5 text-center text-[15px] font-bold text-white hover:bg-[#1D4ED8]"
+                  >
+                    {ticketKnopLabel(detail.betaalmethoden)} →
+                  </button>
+                </>
+              )}
               <div className="flex gap-2.5">
-                <RailButton onClick={() => setOpgeslagen(toggleFavoriet(detail.id))}>
+                <RailButton
+                  onClick={() => setOpgeslagen(toggleFavoriet(detail.id))}
+                >
                   <svg
                     width="14"
                     height="14"
@@ -257,7 +368,14 @@ function EventDetailPage() {
                   {opgeslagen ? 'Opgeslagen' : 'Bewaar'}
                 </RailButton>
                 <RailButton onClick={deel}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0F172A" strokeWidth="2">
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#0F172A"
+                    strokeWidth="2"
+                  >
                     <circle cx="18" cy="5" r="3" />
                     <circle cx="6" cy="12" r="3" />
                     <circle cx="18" cy="19" r="3" />
@@ -273,14 +391,20 @@ function EventDetailPage() {
                 {detail.organisator.charAt(0).toUpperCase()}
               </div>
               <div className="flex-1">
-                <div className="text-[12px] text-[#64748B]">Georganiseerd door</div>
-                <div className="text-[14.5px] font-extrabold">{detail.organisator}</div>
+                <div className="text-[12px] text-[#64748B]">
+                  Georganiseerd door
+                </div>
+                <div className="text-[14.5px] font-extrabold">
+                  {detail.organisator}
+                </div>
               </div>
             </div>
 
             {detail.faqs.length > 0 && (
               <div className="rounded-[16px] border border-[#E5E7EB] p-6">
-                <h3 className="mb-3.5 text-[18px] font-extrabold">Veelgestelde Vragen</h3>
+                <h3 className="mb-3.5 text-[18px] font-extrabold">
+                  Veelgestelde Vragen
+                </h3>
                 {detail.faqs.map((f) => (
                   <details
                     key={f.id}
@@ -288,11 +412,22 @@ function EventDetailPage() {
                   >
                     <summary className="flex cursor-pointer list-none items-center justify-between text-[14px] font-bold">
                       {f.vraag}
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#64748B" strokeWidth="2">
+                      <svg
+                        width="14"
+                        height="14"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="#64748B"
+                        strokeWidth="2"
+                      >
                         <path d="m9 18 6-6-6-6" />
                       </svg>
                     </summary>
-                    {f.antwoord && <div className="mt-2.5 text-[13.5px] leading-[1.6] text-[#64748B]">{f.antwoord}</div>}
+                    {f.antwoord && (
+                      <div className="mt-2.5 text-[13.5px] leading-[1.6] text-[#64748B]">
+                        {f.antwoord}
+                      </div>
+                    )}
                   </details>
                 ))}
               </div>
@@ -327,15 +462,35 @@ function NietGevonden() {
   )
 }
 
-function Card({ children, last }: { children: React.ReactNode; last?: boolean }) {
-  return <div className={`rounded-[16px] border border-[#E5E7EB] p-7 ${last ? '' : 'mb-6'}`}>{children}</div>
+function Card({
+  children,
+  last,
+}: {
+  children: React.ReactNode
+  last?: boolean
+}) {
+  return (
+    <div
+      className={`rounded-[16px] border border-[#E5E7EB] p-7 ${last ? '' : 'mb-6'}`}
+    >
+      {children}
+    </div>
+  )
 }
 
 function DetailRow({ children }: { children: React.ReactNode }) {
-  return <div className="flex gap-2.5 text-[14px] text-[#334155]">{children}</div>
+  return (
+    <div className="flex gap-2.5 text-[14px] text-[#334155]">{children}</div>
+  )
 }
 
-function RailButton({ children, onClick }: { children: React.ReactNode; onClick?: () => void }) {
+function RailButton({
+  children,
+  onClick,
+}: {
+  children: React.ReactNode
+  onClick?: () => void
+}) {
   return (
     <button
       onClick={onClick}
@@ -346,35 +501,40 @@ function RailButton({ children, onClick }: { children: React.ReactNode; onClick?
   )
 }
 
-// Reserveringsformulier (fase G). Verstuurt een publieke aanvraag; de organisator
-// verwerkt die in de admin tot een echt ticket.
-function ReserveerModal({
+// Aanvraagformulier. Verstuurt een publieke ticketaanvraag en stuurt de bezoeker
+// door naar zijn bevestigingspagina; daar staat hoe hij betaalt. De organisator
+// registreert de betaling in de admin en stuurt dan het echte ticket.
+function AanvraagModal({
   eventId,
-  titel,
   tickets,
+  betaalmethoden,
   onClose,
 }: {
   eventId: string
-  titel: string
   tickets: PublicEventDetail['tickets']
+  betaalmethoden: PublicEventDetail['betaalmethoden']
   onClose: () => void
 }) {
+  const navigate = useNavigate()
   const [ticketTypeId, setTicketTypeId] = useState(tickets[0]?.id ?? '')
   const [naam, setNaam] = useState('')
   const [email, setEmail] = useState('')
   const [telefoon, setTelefoon] = useState('')
   const [aantal, setAantal] = useState(1)
   const [opmerking, setOpmerking] = useState('')
+  // Leeg als het event geen betaalmethoden heeft: dan staat de keuze er niet.
+  const [betaalmethode, setBetaalmethode] = useState<string>(
+    betaalmethoden[0] ?? '',
+  )
   const [bezig, setBezig] = useState(false)
   const [fout, setFout] = useState<string | null>(null)
-  const [klaar, setKlaar] = useState(false)
 
   async function verstuur(e: React.FormEvent) {
     e.preventDefault()
     setFout(null)
     setBezig(true)
     try {
-      await createReservering({
+      const { id } = await createTicketaanvraag({
         data: {
           event_id: eventId,
           ticket_type_id: ticketTypeId,
@@ -383,12 +543,12 @@ function ReserveerModal({
           telefoon: telefoon || null,
           aantal,
           opmerking: opmerking || null,
+          betaalmethode: betaalmethode || null,
         },
       })
-      setKlaar(true)
+      navigate({ to: '/aanvraag/$aanvraagId', params: { aanvraagId: id } })
     } catch (err) {
-      setFout(err instanceof Error ? err.message : 'Reserveren mislukt')
-    } finally {
+      setFout(err instanceof Error ? err.message : 'Aanvragen mislukt')
       setBezig(false)
     }
   }
@@ -405,92 +565,114 @@ function ReserveerModal({
         role="dialog"
         aria-modal="true"
       >
-        {klaar ? (
-          <div className="text-center">
-            <div className="mb-3 text-[40px]">🎫</div>
-            <h3 className="mb-2 text-[20px] font-extrabold">Reservering ontvangen</h3>
-            <p className="mb-6 text-[14px] text-[#64748B]">
-              Bedankt! De organisator neemt contact op om je ticket voor <strong>{titel}</strong> te bevestigen en te
-              leveren.
-            </p>
-            <button
-              onClick={onClose}
-              className="rounded-full bg-[#2563EB] px-6 py-3 text-[14px] font-bold text-white hover:bg-[#1D4ED8]"
-            >
-              Sluiten
-            </button>
-          </div>
+        <div className="mb-4 flex items-start justify-between">
+          <h3 className="text-[20px] font-extrabold">
+            {ticketKnopLabel(betaalmethoden)}
+          </h3>
+          <button
+            onClick={onClose}
+            className="text-[#94A3B8] hover:text-[#0F172A]"
+            aria-label="Sluiten"
+          >
+            ✕
+          </button>
+        </div>
+        {tickets.length === 0 ? (
+          <p className="text-[14px] text-[#64748B]">
+            Voor dit event zijn nog geen tickettypes beschikbaar.
+          </p>
         ) : (
-          <>
-            <div className="mb-4 flex items-start justify-between">
-              <h3 className="text-[20px] font-extrabold">Reserveer je ticket</h3>
-              <button onClick={onClose} className="text-[#94A3B8] hover:text-[#0F172A]" aria-label="Sluiten">
-                ✕
-              </button>
-            </div>
-            {tickets.length === 0 ? (
-              <p className="text-[14px] text-[#64748B]">Voor dit event zijn nog geen tickettypes beschikbaar.</p>
-            ) : (
-              <form onSubmit={verstuur} className="flex flex-col gap-3.5">
-                <Veld label="Tickettype">
-                  <select
-                    value={ticketTypeId}
-                    onChange={(e) => setTicketTypeId(e.target.value)}
-                    className="w-full rounded-[10px] border border-[#E5E7EB] bg-[#F8FAFC] px-3.5 py-2.5 text-[14px]"
-                  >
-                    {tickets.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.naam}
-                      </option>
-                    ))}
-                  </select>
-                </Veld>
-                <Veld label="Aantal">
-                  <input
-                    type="number"
-                    min={1}
-                    max={10}
-                    value={aantal}
-                    onChange={(e) => setAantal(Number(e.target.value))}
-                    className="w-full rounded-[10px] border border-[#E5E7EB] bg-[#F8FAFC] px-3.5 py-2.5 text-[14px]"
-                  />
-                </Veld>
-                <Veld label="Naam">
-                  <ReserveerInput value={naam} onChange={setNaam} required />
-                </Veld>
-                <Veld label="E-mail">
-                  <ReserveerInput value={email} onChange={setEmail} type="email" />
-                </Veld>
-                <Veld label="Telefoon">
-                  <ReserveerInput value={telefoon} onChange={setTelefoon} type="tel" />
-                </Veld>
-                <p className="-mt-1 text-[12px] text-[#94A3B8]">Vul minstens een e-mailadres óf telefoonnummer in.</p>
-                <Veld label="Opmerking (optioneel)">
-                  <textarea
-                    value={opmerking}
-                    onChange={(e) => setOpmerking(e.target.value)}
-                    rows={2}
-                    className="w-full resize-y rounded-[10px] border border-[#E5E7EB] bg-[#F8FAFC] px-3.5 py-2.5 text-[14px] outline-none focus:border-[#2563EB]"
-                  />
-                </Veld>
-                {fout && <p className="text-[13px] font-semibold text-[#EF4444]">{fout}</p>}
-                <button
-                  type="submit"
-                  disabled={bezig}
-                  className="mt-1 rounded-full bg-[#2563EB] py-3 text-[15px] font-bold text-white hover:bg-[#1D4ED8] disabled:opacity-50"
+          <form onSubmit={verstuur} className="flex flex-col gap-3.5">
+            <Veld label="Tickettype">
+              <select
+                value={ticketTypeId}
+                onChange={(e) => setTicketTypeId(e.target.value)}
+                className="w-full rounded-[10px] border border-[#E5E7EB] bg-[#F8FAFC] px-3.5 py-2.5 text-[14px]"
+              >
+                {tickets.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.naam}
+                  </option>
+                ))}
+              </select>
+            </Veld>
+            <Veld label="Aantal">
+              <input
+                type="number"
+                min={1}
+                max={10}
+                value={aantal}
+                onChange={(e) => setAantal(Number(e.target.value))}
+                className="w-full rounded-[10px] border border-[#E5E7EB] bg-[#F8FAFC] px-3.5 py-2.5 text-[14px]"
+              />
+            </Veld>
+            <Veld label="Naam">
+              <ReserveerInput value={naam} onChange={setNaam} required />
+            </Veld>
+            <Veld label="E-mail">
+              <ReserveerInput value={email} onChange={setEmail} type="email" />
+            </Veld>
+            <Veld label="Telefoon">
+              <ReserveerInput
+                value={telefoon}
+                onChange={setTelefoon}
+                type="tel"
+              />
+            </Veld>
+            <p className="-mt-1 text-[12px] text-[#94A3B8]">
+              Vul minstens een e-mailadres óf telefoonnummer in.
+            </p>
+            {/* Voorkeur, geen betaling: de organisator ziet hem in de admin
+                terug. Alleen tonen als hij methoden heeft aangezet. */}
+            {betaalmethoden.length > 0 && (
+              <Veld label="Hoe wil je betalen?">
+                <select
+                  value={betaalmethode}
+                  onChange={(e) =>
+                    setBetaalmethode(e.target.value)
+                  }
+                  className="w-full rounded-[10px] border border-[#E5E7EB] bg-[#F8FAFC] px-3.5 py-2.5 text-[14px]"
                 >
-                  {bezig ? 'Bezig…' : 'Reservering versturen'}
-                </button>
-              </form>
+                  {betaalmethoden.map((m) => (
+                    <option key={m} value={m}>
+                      {BETAALMETHODE_LABEL[m] ?? m}
+                    </option>
+                  ))}
+                </select>
+              </Veld>
             )}
-          </>
+            <Veld label="Opmerking (optioneel)">
+              <textarea
+                value={opmerking}
+                onChange={(e) => setOpmerking(e.target.value)}
+                rows={2}
+                className="w-full resize-y rounded-[10px] border border-[#E5E7EB] bg-[#F8FAFC] px-3.5 py-2.5 text-[14px] outline-none focus:border-[#2563EB]"
+              />
+            </Veld>
+            {fout && (
+              <p className="text-[13px] font-semibold text-[#EF4444]">{fout}</p>
+            )}
+            <button
+              type="submit"
+              disabled={bezig}
+              className="mt-1 rounded-full bg-[#2563EB] py-3 text-[15px] font-bold text-white hover:bg-[#1D4ED8] disabled:opacity-50"
+            >
+              {bezig ? 'Bezig…' : 'Aanvraag versturen'}
+            </button>
+          </form>
         )}
       </div>
     </div>
   )
 }
 
-function Veld({ label, children }: { label: string; children: React.ReactNode }) {
+function Veld({
+  label,
+  children,
+}: {
+  label: string
+  children: React.ReactNode
+}) {
   return (
     <label className="flex flex-col gap-1">
       <span className="text-[13px] font-bold">{label}</span>

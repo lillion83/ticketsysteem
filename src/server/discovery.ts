@@ -3,6 +3,7 @@ import { and, asc, eq, inArray } from 'drizzle-orm'
 import { db } from '#/db/index'
 import {
   eventAgenda,
+  eventBetaalmethoden,
   eventFaq,
   eventSprekers,
   events,
@@ -172,6 +173,13 @@ export type PublicEventDetail = {
     aantalBeschikbaar: number
     features: Array<string>
   }>
+  /**
+   * `false` → de organisator verkoopt niet via het platform: de pagina toont
+   * flyer en informatie, en laat het hele ticketblok weg (Migratieplan §1.1).
+   */
+  verkoopActief: boolean
+  /** Actieve betaalmethoden, in de volgorde die de organisator koos. */
+  betaalmethoden: Array<'whatsapp' | 'bank' | 'contant' | 'online'>
 }
 
 export const getPublicEvent = createServerFn({ method: 'GET' })
@@ -187,6 +195,7 @@ export const getPublicEvent = createServerFn({ method: 'GET' })
         categorie: events.categorie,
         cover_afbeelding_url: events.cover_afbeelding_url,
         beschrijving: events.beschrijving,
+        verkoop_actief: events.verkoop_actief,
         organisator: organizations.naam,
       })
       .from(events)
@@ -197,24 +206,35 @@ export const getPublicEvent = createServerFn({ method: 'GET' })
     if (rows.length === 0) throw new Error('Event niet gevonden')
     const e = rows[0]
 
-    const [typeRows, sprekerRows, agendaRows, faqRows] = await Promise.all([
-      db.select().from(ticketTypes).where(eq(ticketTypes.event_id, eventId)),
-      db
-        .select()
-        .from(eventSprekers)
-        .where(eq(eventSprekers.event_id, eventId))
-        .orderBy(asc(eventSprekers.volgorde)),
-      db
-        .select()
-        .from(eventAgenda)
-        .where(eq(eventAgenda.event_id, eventId))
-        .orderBy(asc(eventAgenda.volgorde)),
-      db
-        .select()
-        .from(eventFaq)
-        .where(eq(eventFaq.event_id, eventId))
-        .orderBy(asc(eventFaq.volgorde)),
-    ])
+    const [typeRows, sprekerRows, agendaRows, faqRows, methodeRows] =
+      await Promise.all([
+        db.select().from(ticketTypes).where(eq(ticketTypes.event_id, eventId)),
+        db
+          .select()
+          .from(eventSprekers)
+          .where(eq(eventSprekers.event_id, eventId))
+          .orderBy(asc(eventSprekers.volgorde)),
+        db
+          .select()
+          .from(eventAgenda)
+          .where(eq(eventAgenda.event_id, eventId))
+          .orderBy(asc(eventAgenda.volgorde)),
+        db
+          .select()
+          .from(eventFaq)
+          .where(eq(eventFaq.event_id, eventId))
+          .orderBy(asc(eventFaq.volgorde)),
+        db
+          .select({ soort: eventBetaalmethoden.soort })
+          .from(eventBetaalmethoden)
+          .where(
+            and(
+              eq(eventBetaalmethoden.event_id, eventId),
+              eq(eventBetaalmethoden.actief, true),
+            ),
+          )
+          .orderBy(asc(eventBetaalmethoden.volgorde)),
+      ])
 
     const prijzenSrd = typeRows.map((t) => Number(t.prijs_srd))
     const prijsVanafSrd = prijzenSrd.length ? Math.min(...prijzenSrd) : null
@@ -259,5 +279,7 @@ export const getPublicEvent = createServerFn({ method: 'GET' })
         aantalBeschikbaar: Number(t.aantal_beschikbaar),
         features: t.features ?? [],
       })),
+      verkoopActief: e.verkoop_actief,
+      betaalmethoden: methodeRows.map((m) => m.soort),
     }
   })

@@ -5,6 +5,7 @@ import { db } from '#/db/index'
 import {
   events,
   eventBetaalmethoden,
+  organizations,
   reserveringen,
   ticketTypes,
   tickets,
@@ -12,6 +13,8 @@ import {
 import { requireAuth } from '#/server/session'
 import { vindKoperUserId } from '#/server/mijnTickets'
 import { signTicket } from '#/lib/ticketcode'
+import { maakHandmatig } from '#/server/payments/handmatig'
+import { formatDateLong, formatTimeRange } from '#/lib/datum'
 
 // Ticketaanvragen (heette in fase G "reserveringen"; de tabel houdt die naam —
 // zie Migratieplan §0). Een bezoeker vraagt publiek een ticket aan, de
@@ -94,21 +97,138 @@ export const createTicketaanvraag = createServerFn({ method: 'POST' })
 
     const vervalt = new Date(Date.now() + GELDIG_UREN * 60 * 60 * 1000)
 
-    await db.insert(reserveringen).values({
-      event_id: data.event_id,
-      ticket_type_id: data.ticket_type_id,
-      organization_id: organizationId,
-      naam: data.naam.trim(),
-      email: data.email?.trim() || null,
-      telefoon: data.telefoon?.trim() || null,
-      aantal: String(aantal),
-      opmerking: data.opmerking?.trim() || null,
-      betaalmethode: data.betaalmethode?.trim() || null,
-      vervalt_op: vervalt,
+    const nieuw = await db
+      .insert(reserveringen)
+      .values({
+        event_id: data.event_id,
+        ticket_type_id: data.ticket_type_id,
+        organization_id: organizationId,
+        naam: data.naam.trim(),
+        email: data.email?.trim() || null,
+        telefoon: data.telefoon?.trim() || null,
+        aantal: String(aantal),
+        opmerking: data.opmerking?.trim() || null,
+        betaalmethode: data.betaalmethode?.trim() || null,
+        vervalt_op: vervalt,
+      })
+      .returning({ id: reserveringen.id })
+
+    // Alleen het id terug: dat is de onraadbare sleutel van de
+    // bevestigingspagina (`/aanvraag/$id`), zelfde patroon als de ticketcode in
+    // `t.$code`. Verder lekken we niets over het event of de organisatie.
+    return { id: nieuw[0].id }
+  })
+
+// --- Bevestigingspagina bezoeker ---
+
+export type PubliekeAanvraag = {
+  id: string
+  status: string
+  naam: string
+  aantal: number
+  typeNaam: string
+  prijsSrd: number
+  totaalSrd: number
+  vervaltOp: string | null
+  eventId: string
+  eventTitel: string
+  dateLong: string
+  timeRange: string
+  locatie: string | null
+  organisator: string
+  /** Alleen voor de WhatsApp-knop; leeg = geen knop, alleen de instructietekst. */
+  organisatorTelefoon: string | null
+  /** Uit de handmatige provider: de tekst van de organisator, of de standaard. */
+  instructies: string
+  betaalmethoden: Array<'whatsapp' | 'bank' | 'contant' | 'online'>
+}
+
+/**
+ * Wat de bezoeker ziet nadat hij een ticket heeft aangevraagd. Publiek en
+ * zonder sessie: het aanvraag-uuid is de sleutel, precies zoals de ticketcode
+ * dat is in `t.$code`. Zelfde bewuste uitzondering op harde regel 3 als
+ * publicTicket.ts — de organisatie komt uit de aanvraag zelf.
+ *
+ * Alleen wat de bezoeker nodig heeft om te betalen. Nadrukkelijk niet:
+ * e-mailadres, telefoonnummer of opmerking van de aanvrager, en geen
+ * betaalreferentie — die staan wel in de rij maar horen niet op een pagina die
+ * met een link te delen is.
+ */
+export const getPubliekeAanvraag = createServerFn({ method: 'GET' })
+  .validator((id: string) => id)
+  .handler(async ({ data: id }): Promise<PubliekeAanvraag> => {
+    const rows = await db
+      .select({
+        id: reserveringen.id,
+        status: reserveringen.status,
+        naam: reserveringen.naam,
+        aantal: reserveringen.aantal,
+        vervalt_op: reserveringen.vervalt_op,
+        type_naam: ticketTypes.naam,
+        prijs_srd: ticketTypes.prijs_srd,
+        event_id: events.id,
+        event_naam: events.naam,
+        datum_start: events.datum_start,
+        datum_eind: events.datum_eind,
+        locatie: events.locatie,
+        betaalinstructies: events.betaalinstructies,
+        organisator: organizations.naam,
+        organisator_telefoon: organizations.telefoon,
+      })
+      .from(reserveringen)
+      .innerJoin(ticketTypes, eq(reserveringen.ticket_type_id, ticketTypes.id))
+      .innerJoin(events, eq(reserveringen.event_id, events.id))
+      .innerJoin(
+        organizations,
+        eq(reserveringen.organization_id, organizations.id),
+      )
+      .where(eq(reserveringen.id, id))
+      .limit(1)
+    if (rows.length === 0) throw new Error('Aanvraag niet gevonden')
+    const r = rows[0]
+
+    const methodeRows = await db
+      .select({ soort: eventBetaalmethoden.soort })
+      .from(eventBetaalmethoden)
+      .where(
+        and(
+          eq(eventBetaalmethoden.event_id, r.event_id),
+          eq(eventBetaalmethoden.actief, true),
+        ),
+      )
+      .orderBy(eventBetaalmethoden.volgorde)
+
+    const aantal = Math.max(Number(r.aantal), 1)
+    const prijsSrd = Number(r.prijs_srd)
+
+    // Via de provider-laag (stap 7) in plaats van rechtstreeks uit het event:
+    // als hier ooit een echte provider bij komt, is dit de plek waar zijn
+    // `start()` een redirect teruggeeft in plaats van een instructietekst.
+    const start = await maakHandmatig(r.betaalinstructies).start({
+      aanvraagId: r.id,
+      bedragSrd: String(prijsSrd * aantal),
+      omschrijving: `${aantal}× ${r.type_naam} — ${r.event_naam}`,
     })
 
-    // Bewust minimale respons: niets teruglekken over het event/de organisatie.
-    return { ok: true }
+    return {
+      id: r.id,
+      status: r.status,
+      naam: r.naam,
+      aantal,
+      typeNaam: r.type_naam,
+      prijsSrd,
+      totaalSrd: prijsSrd * aantal,
+      vervaltOp: r.vervalt_op ? r.vervalt_op.toISOString() : null,
+      eventId: r.event_id,
+      eventTitel: r.event_naam,
+      dateLong: formatDateLong(r.datum_start),
+      timeRange: formatTimeRange(r.datum_start, r.datum_eind),
+      locatie: r.locatie,
+      organisator: r.organisator,
+      organisatorTelefoon: r.organisator_telefoon,
+      instructies: start.soort === 'handmatig' ? start.instructies : '',
+      betaalmethoden: methodeRows.map((m) => m.soort),
+    }
   })
 
 // --- Admin (auth-gescoopt) ---
