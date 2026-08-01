@@ -36,7 +36,7 @@ Interne namen (de tabel `reserveringen`, het type `Leverkanaal`) blijven staan.
 | 2   | `src/lib/verkoopkanaal.ts` + chipgroep             | ✅             |
 | 3   | Serverlaag splitsen (`ticketaanvragen.ts`)         | ✅             |
 | 4   | Admin-UI: tabs, badges, detailpaneel               | ✅             |
-| 5   | Eventformulier: promokaart, ja/nee, betaalmethoden | openstaand     |
+| 5   | Eventformulier: promokaart, ja/nee, betaalmethoden | ✅             |
 | 6   | Publieke pagina + bevestigingspagina bezoeker      | openstaand     |
 | 7   | `payments/`-map met alleen de handmatige provider  | ✅ (vervroegd) |
 | 8   | Opruimen: re-exports weg, `afgewezen` uitfaseren   | openstaand     |
@@ -102,6 +102,24 @@ raken, en die blijft ongemoeid. De koppeling loopt daarom via event, tickettype,
 koper en een verkoopkanaal dat op een online aanvraag wijst. Twee aanvragen van
 dezelfde persoon voor hetzelfde tickettype vallen samen. Goed genoeg om
 leverknoppen bij te tonen, **nooit** om iets op te muteren.
+
+## 5. Eventformulier
+
+Stap 2 van `src/routes/events.new.tsx` heet nu "Tickets verkopen" en begint met
+de vraag óf de organisator digitaal wil verkopen — niet met een tier-editor. De
+promokaart erboven benoemt expliciet dat hij zijn manier van geld ontvangen niet
+hoeft te veranderen; dat is de drempel, niet de QR-code.
+
+Bij "nee" verdwijnen tier-editor, betaalmethoden en instructies, en gaat er een
+lege `tiers`-array mee. De server dwingt dat ook af in `parseFullEventInput`.
+
+De tier-kaart toont nog drie velden: naam, prijs, aantal. Beschrijving,
+kenmerken en vroegboekkorting zitten achter `<details>` "Meer opties".
+`updateTier` en `addTier` zijn ongewijzigd.
+
+Het formulier schrijft `verkoop_actief`, `betaalinstructies` en rijen in
+`event_betaalmethoden`. `soort = 'online'` biedt het niet aan: die rij staat
+uitgeschakeld in beeld als "Uni5Pay & Mope — binnenkort".
 
 ## 7. `payments/` — aansluiting, geen betaling
 
