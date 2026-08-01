@@ -143,14 +143,41 @@ daarom publiek en org-loos, met dezelfde uitzondering op harde regel 3 als
 `publicTicket.ts`. Die functie geeft bewust **niet** het e-mailadres, telefoon-
 nummer, de opmerking of de betaalreferentie terug — de link is deelbaar.
 
-De pagina toont status, samenvatting, totaalbedrag en een blok per actieve
-betaalmethode. WhatsApp wordt een groene knop via `whatsappLink()` op
-`organizations.telefoon`; staat daar niets, dan valt hij terug op de
-instructietekst. Bank en contant verwijzen naar diezelfde tekst — het
-eventformulier schrijft nog geen `config` per methode, dus rekeningnummers staan
-in `betaalinstructies`. De tekst komt via `maakHandmatig(...).start()` uit de
-provider-laag, niet rechtstreeks uit het event: daar geeft een echte provider
-later een redirect terug.
+De pagina volgt scherm 02 van het ontwerp: donkere kop met groene check en
+"Bedankt, {voornaam}!", één samenvattingsregel met "Te betalen", dan "Voltooi nu
+je betaling" met een kaart per methode, en een grijze voetnoot met de
+48-uurstermijn. Bewust géén `SiteNav`/`SiteFooter` — het is een telefoonscherm
+waar je invalt, geen pagina om vanaf te navigeren.
+
+Het ontwerp toont maar één toestand: net aangevraagd. De statussen betaald,
+verzonden, geannuleerd en verlopen kleuren alleen de kop en laten het betaalblok
+weg; de link is deelbaar en wordt later opnieuw geopend.
+
+De instructietekst komt via `maakHandmatig(...).start()` uit de provider-laag,
+niet rechtstreeks uit het event: daar geeft een echte provider later een redirect
+terug.
+
+### Betaalmethoden dragen hun eigen gegevens
+
+Scherm 02 toont per methode concrete gegevens — banknaam, rekeningnummer,
+kenmerk, WhatsApp-nummer — terwijl de methodenkiezer in datzelfde ontwerp alleen
+vinkjes had. Die gegevens komen uit `event_betaalmethoden.config`, dat daar al
+voor bestond. `src/lib/betaalmethoden.ts` legt de vorm vast: welke velden een
+methode heeft, en `leesConfig` / `schrijfConfig` voor de JSON eromheen. Het
+eventformulier toont die velden onder elke aangevinkte methode.
+
+Invullen is nooit verplicht. Een leeg veld verschijnt niet op de kaart, en events
+van vóór deze wijziging hebben `config = null` — die vallen terug op
+`betaalinstructies`, zoals daarvoor. Het WhatsApp-nummer valt terug op
+`organizations.telefoon`.
+
+**Het kenmerk** (`KNF-4821`) is afgeleid, niet opgeslagen: initialen van de
+eventnaam plus vier cijfers uit het aanvraag-uuid, via `betaalKenmerk()`. Geen
+kolom en geen migratie, en de admin berekent hetzelfde kenmerk uit dezelfde twee
+waarden zodat een binnengekomen overschrijving thuis te brengen is. Het is een
+leeshulp voor mensen, geen sleutel — twee aanvragen binnen één event kunnen in
+theorie hetzelfde nummer krijgen. `reserveringen.betaalreferentie` blijft waar de
+organisator het kenmerk van de bank zelf noteert.
 
 ## 7. `payments/` — aansluiting, geen betaling
 

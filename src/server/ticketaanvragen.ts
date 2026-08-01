@@ -15,6 +15,8 @@ import { vindKoperUserId } from '#/server/mijnTickets'
 import { signTicket } from '#/lib/ticketcode'
 import { maakHandmatig } from '#/server/payments/handmatig'
 import { formatDateLong, formatTimeRange } from '#/lib/datum'
+import { betaalKenmerk, leesConfig } from '#/lib/betaalmethoden'
+import type { BetaalmethodeSoort, MethodeConfig } from '#/lib/betaalmethoden'
 
 // Ticketaanvragen (heette in fase G "reserveringen"; de tabel houdt die naam —
 // zie Migratieplan §0). Een bezoeker vraagt publiek een ticket aan, de
@@ -140,7 +142,13 @@ export type PubliekeAanvraag = {
   organisatorTelefoon: string | null
   /** Uit de handmatige provider: de tekst van de organisator, of de standaard. */
   instructies: string
-  betaalmethoden: Array<'whatsapp' | 'bank' | 'contant' | 'online'>
+  /** Afgeleid kenmerk voor bij de overschrijving, vorm `KNF-4821`. */
+  kenmerk: string
+  /** Per actieve methode de gegevens die de organisator heeft ingevuld. */
+  betaalmethoden: Array<{
+    soort: BetaalmethodeSoort
+    gegevens: MethodeConfig
+  }>
 }
 
 /**
@@ -188,7 +196,10 @@ export const getPubliekeAanvraag = createServerFn({ method: 'GET' })
     const r = rows[0]
 
     const methodeRows = await db
-      .select({ soort: eventBetaalmethoden.soort })
+      .select({
+        soort: eventBetaalmethoden.soort,
+        config: eventBetaalmethoden.config,
+      })
       .from(eventBetaalmethoden)
       .where(
         and(
@@ -227,7 +238,11 @@ export const getPubliekeAanvraag = createServerFn({ method: 'GET' })
       organisator: r.organisator,
       organisatorTelefoon: r.organisator_telefoon,
       instructies: start.soort === 'handmatig' ? start.instructies : '',
-      betaalmethoden: methodeRows.map((m) => m.soort),
+      kenmerk: betaalKenmerk(r.event_naam, r.id),
+      betaalmethoden: methodeRows.map((m) => ({
+        soort: m.soort,
+        gegevens: leesConfig(m.config),
+      })),
     }
   })
 
@@ -513,10 +528,14 @@ export const ticketsVoorAanvraag = createServerFn({ method: 'GET' })
 // --- Betaalmethoden per event ---
 
 export type Betaalmethode = {
-  soort: 'whatsapp' | 'bank' | 'contant' | 'online'
+  soort: BetaalmethodeSoort
   provider: string | null
+  /** JSON-object als tekst; zie src/lib/betaalmethoden.ts. */
   config: string | null
 }
+
+/** Ruime bovengrens: dit is een handvol korte velden, geen vrije opslag. */
+const MAX_CONFIG = 2000
 
 /**
  * Publiek: de bezoeker moet ná zijn aanvraag zien hoe hij kan betalen. Zelfde
@@ -558,6 +577,9 @@ export const setBetaalmethoden = createServerFn({ method: 'POST' })
         // Harde regel 6: geen online betaling. De kolom bestaat alleen zodat
         // Uni5Pay/Mope er later bij kunnen zonder enum-migratie.
         throw new Error('Online betalen is nog niet beschikbaar')
+      }
+      if ((m.config?.length ?? 0) > MAX_CONFIG) {
+        throw new Error('Betaalgegevens te lang')
       }
     }
     return data

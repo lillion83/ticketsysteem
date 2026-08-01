@@ -41,6 +41,7 @@ import {
   verkoopkanaalLabel,
 } from '#/lib/verkoopkanaal'
 import type { Verkoopkanaal } from '#/lib/verkoopkanaal'
+import { betaalKenmerk } from '#/lib/betaalmethoden'
 
 type Categorie = (typeof eventCategories)[number]
 
@@ -976,6 +977,7 @@ function AanvraagDetail({
   aanvraag: Ticketaanvraag
   onKlaar: () => void
 }) {
+  const { event } = Route.useLoaderData()
   const [bezig, setBezig] = useState(false)
   const [fout, setFout] = useState<string | null>(null)
   const [tickets, setTickets] = useState<Array<LeverbaarTicket> | null>(null)
@@ -1035,6 +1037,13 @@ function AanvraagDetail({
       <div className="overflow-hidden rounded-[12px] border border-[#E5E7EB] text-[13px]">
         <Regel label="Telefoon" waarde={aanvraag.telefoon} mono />
         <Regel label="E-mail" waarde={aanvraag.email} />
+        {/* Zelfde kenmerk als op de bevestigingspagina van de bezoeker, uit
+            dezelfde helper afgeleid — zo is een overschrijving thuis te brengen. */}
+        <Regel
+          label="Kenmerk"
+          waarde={betaalKenmerk(event.naam, aanvraag.id)}
+          mono
+        />
         <Regel label="Bedrag" waarde={aanvraagBedrag(aanvraag)} vet laatste />
       </div>
 

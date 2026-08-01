@@ -11,6 +11,8 @@ import { CoverUpload } from '#/components/cover-upload'
 import { createFullEvent } from '#/server/events'
 import type { FullEventInput } from '#/server/events'
 import { getCurrentUser } from '#/server/session'
+import { METHODE_VELDEN, schrijfConfig } from '#/lib/betaalmethoden'
+import type { MethodeConfig } from '#/lib/betaalmethoden'
 
 // Organiseer een Event — 3-staps flow (ontwerp: OrganiseerEvent.dc.html).
 // Client-side formulierstate; "Publiceer Event" / "Opslaan als Concept"
@@ -146,6 +148,13 @@ function OrganiseerEvent() {
     'bank',
     'contant',
   ])
+  // Gegevens per methode: het nummer, de rekening, het afhaalpunt. Die staan op
+  // de bevestigingspagina van de bezoeker (ontwerp scherm 02) en gaan mee als
+  // `config` op de methode. Leeg laten mag — dan valt die kaart terug op de
+  // betaalinstructies hieronder.
+  const [methodeConfig, setMethodeConfig] = useState<
+    Record<MethodeKey, MethodeConfig>
+  >({ whatsapp: {}, bank: {}, contant: {} })
   const [instructies, setInstructies] = useState(STANDAARD_INSTRUCTIES)
 
   // Muziek en nachtleven draaien om de line-up, dus die staat daar uitgeklapt.
@@ -201,7 +210,10 @@ function OrganiseerEvent() {
       verkoop_actief: verkoopActief,
       betaalinstructies: verkoopActief ? instructies || null : null,
       betaalmethoden: verkoopActief
-        ? methoden.map((soort) => ({ soort, config: null }))
+        ? methoden.map((soort) => ({
+            soort,
+            config: schrijfConfig(methodeConfig[soort]),
+          }))
         : [],
     }
     setBezig(true)
@@ -664,12 +676,19 @@ function OrganiseerEvent() {
 
                 <BetaalmethodenKiezer
                   gekozen={methoden}
+                  config={methodeConfig}
                   onToggle={(key) =>
                     setMethoden((m) =>
                       m.includes(key)
                         ? m.filter((x) => x !== key)
                         : [...m, key],
                     )
+                  }
+                  onVeld={(key, veld, waarde) =>
+                    setMethodeConfig((c) => ({
+                      ...c,
+                      [key]: { ...c[key], [veld]: waarde },
+                    }))
                   }
                 />
 
@@ -927,10 +946,14 @@ function KeuzeKaart({
  */
 function BetaalmethodenKiezer({
   gekozen,
+  config,
   onToggle,
+  onVeld,
 }: {
   gekozen: Array<MethodeKey>
+  config: Record<MethodeKey, MethodeConfig>
   onToggle: (key: MethodeKey) => void
+  onVeld: (key: MethodeKey, veld: string, waarde: string) => void
 }) {
   return (
     <div>
@@ -944,29 +967,58 @@ function BetaalmethodenKiezer({
         {BETAALMETHODEN.map((m) => {
           const aan = gekozen.includes(m.key)
           return (
-            <button
-              key={m.key}
-              type="button"
-              onClick={() => onToggle(m.key)}
-              aria-pressed={aan}
-              className="flex w-full items-center gap-3 rounded-[12px] border border-[#E5E7EB] bg-white px-3.5 py-3 text-left hover:border-[#93C5FD]"
-            >
-              <span
-                className={`flex h-5 w-5 flex-none items-center justify-center rounded-[6px] text-[12px] font-extrabold ${
-                  aan
-                    ? 'bg-[#2563EB] text-white'
-                    : 'border-[1.5px] border-[#CBD5E1] bg-white'
-                }`}
+            <div key={m.key}>
+              <button
+                type="button"
+                onClick={() => onToggle(m.key)}
+                aria-pressed={aan}
+                className="flex w-full items-center gap-3 rounded-[12px] border border-[#E5E7EB] bg-white px-3.5 py-3 text-left hover:border-[#93C5FD]"
               >
-                {aan ? '✓' : ''}
-              </span>
-              <span className="flex-1 text-[14px] font-bold">{m.label}</span>
-              {m.populair && aan && (
-                <span className="flex-none rounded-full bg-[#DCFCE7] px-2 py-[3px] text-[11px] font-extrabold text-[#16A34A]">
-                  populair
+                <span
+                  className={`flex h-5 w-5 flex-none items-center justify-center rounded-[6px] text-[12px] font-extrabold ${
+                    aan
+                      ? 'bg-[#2563EB] text-white'
+                      : 'border-[1.5px] border-[#CBD5E1] bg-white'
+                  }`}
+                >
+                  {aan ? '✓' : ''}
                 </span>
+                <span className="flex-1 text-[14px] font-bold">{m.label}</span>
+                {m.populair && aan && (
+                  <span className="flex-none rounded-full bg-[#DCFCE7] px-2 py-[3px] text-[11px] font-extrabold text-[#16A34A]">
+                    populair
+                  </span>
+                )}
+              </button>
+              {/* De gegevens die de bezoeker straks op zijn bevestigingspagina
+                  ziet. Alleen bij een aangevinkte methode, en nooit verplicht. */}
+              {aan && METHODE_VELDEN[m.key].length > 0 && (
+                <div className="mt-1.5 ml-8 flex flex-col gap-1.5">
+                  {METHODE_VELDEN[m.key].map((v) =>
+                    v.lang ? (
+                      <textarea
+                        key={v.key}
+                        rows={2}
+                        value={config[m.key][v.key] ?? ''}
+                        onChange={(e) => onVeld(m.key, v.key, e.target.value)}
+                        placeholder={v.placeholder}
+                        aria-label={v.label}
+                        className="w-full resize-y rounded-[10px] border border-[#E5E7EB] bg-[#F8FAFC] px-3 py-2 text-[13px] outline-none focus:border-[#2563EB]"
+                      />
+                    ) : (
+                      <input
+                        key={v.key}
+                        value={config[m.key][v.key] ?? ''}
+                        onChange={(e) => onVeld(m.key, v.key, e.target.value)}
+                        placeholder={v.placeholder}
+                        aria-label={v.label}
+                        className="w-full rounded-[10px] border border-[#E5E7EB] bg-[#F8FAFC] px-3 py-2 text-[13px] outline-none focus:border-[#2563EB]"
+                      />
+                    ),
+                  )}
+                </div>
               )}
-            </button>
+            </div>
           )
         })}
         <div className="flex items-center gap-3 rounded-[12px] border border-dashed border-[#E5E7EB] px-3.5 py-3 opacity-70">

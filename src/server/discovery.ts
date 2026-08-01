@@ -11,6 +11,7 @@ import {
   ticketTypes,
 } from '#/db/schema'
 import { formatDateLine, formatDateLong, formatTimeRange } from '#/lib/datum'
+import type { BetaalmethodeSoort } from '#/lib/betaalmethoden'
 
 // Publieke discovery-lezers (PLAN fase 2). Zelfde bewuste uitzondering op harde
 // regel 3 als src/server/publicTicket.ts: hier is geen sessie en dus geen
@@ -179,7 +180,7 @@ export type PublicEventDetail = {
    */
   verkoopActief: boolean
   /** Actieve betaalmethoden, in de volgorde die de organisator koos. */
-  betaalmethoden: Array<'whatsapp' | 'bank' | 'contant' | 'online'>
+  betaalmethoden: Array<BetaalmethodeSoort>
 }
 
 export const getPublicEvent = createServerFn({ method: 'GET' })

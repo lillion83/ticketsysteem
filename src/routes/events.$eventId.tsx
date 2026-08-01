@@ -12,6 +12,9 @@ import { isFavoriet, toggleFavoriet } from '#/components/discovery/favorites'
 import { getPublicEvent } from '#/server/discovery'
 import type { PublicEventDetail } from '#/server/discovery'
 import { createTicketaanvraag } from '#/server/ticketaanvragen'
+// Labels voor de voorkeurskeuze in het aanvraagformulier — zelfde bron als het
+// eventformulier en de bevestigingspagina.
+import { BETAALMETHODE_LABEL } from '#/lib/betaalmethoden'
 
 // Event-detailpagina (ontwerp: EventDetail.dc.html), gevoed door de database.
 export const Route = createFileRoute('/events/$eventId')({
@@ -28,15 +31,6 @@ export const Route = createFileRoute('/events/$eventId')({
 function ticketKnopLabel(betaalmethoden: PublicEventDetail['betaalmethoden']) {
   const kopen = betaalmethoden.some((m) => m === 'bank' || m === 'online')
   return kopen ? 'Koop ticket' : 'Ticket aanvragen'
-}
-
-// Labels voor de voorkeurskeuze in het aanvraagformulier. Alleen de methoden die
-// de organisator heeft aangezet, in zijn volgorde.
-const BETAALMETHODE_LABEL: Record<string, string> = {
-  whatsapp: 'WhatsApp',
-  bank: 'Bankoverschrijving',
-  contant: 'Contant',
-  online: 'Online betalen',
 }
 
 // Accent-paletje voor de agenda-tijdlijn (puur visueel, cyclet per item).
@@ -628,14 +622,12 @@ function AanvraagModal({
               <Veld label="Hoe wil je betalen?">
                 <select
                   value={betaalmethode}
-                  onChange={(e) =>
-                    setBetaalmethode(e.target.value)
-                  }
+                  onChange={(e) => setBetaalmethode(e.target.value)}
                   className="w-full rounded-[10px] border border-[#E5E7EB] bg-[#F8FAFC] px-3.5 py-2.5 text-[14px]"
                 >
                   {betaalmethoden.map((m) => (
                     <option key={m} value={m}>
-                      {BETAALMETHODE_LABEL[m] ?? m}
+                      {BETAALMETHODE_LABEL[m]}
                     </option>
                   ))}
                 </select>

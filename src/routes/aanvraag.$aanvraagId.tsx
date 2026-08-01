@@ -1,14 +1,16 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { SiteFooter, SiteNav, SitePage } from '#/components/discovery/site'
 import { formatPrice, useCurrency } from '#/components/discovery/currency'
 import { getPubliekeAanvraag } from '#/server/ticketaanvragen'
 import type { PubliekeAanvraag } from '#/server/ticketaanvragen'
 import { whatsappLink } from '#/lib/whatsapp'
 
-// Bevestigingspagina voor de bezoeker (Migratieplan §4.3). Publiek en zonder
-// login: het uuid in de URL is de sleutel, zoals de ticketcode dat is in
-// `t.$code`. Vervangt de inline "bedankt" in de aanvraagmodal — de bezoeker moet
-// nog betalen, en dat is te veel om in een modal te proppen.
+// Bevestigingspagina voor de bezoeker — ontwerp: "Ticketverkoop UX.dc.html",
+// scherm 02 "Bezoeker · bevestiging". Publiek en zonder login: het uuid in de URL
+// is de sleutel, zoals de ticketcode dat is in `t.$code`.
+//
+// Bewust géén SiteNav/SiteFooter: dit is een telefoonscherm dat je vanuit het
+// aanvraagformulier binnenvalt, geen pagina om vanaf te navigeren. Het ontwerp
+// zet er dan ook niets omheen.
 //
 // Hier gebeurt geen betaling (harde regel 6). De pagina vertelt hoe de bezoeker
 // het geld overmaakt; de organisator drukt daarna in de admin op "Betaling
@@ -20,204 +22,247 @@ export const Route = createFileRoute('/aanvraag/$aanvraagId')({
   errorComponent: NietGevonden,
 })
 
-// Wat de bezoeker per status te zien krijgt. De DB-waarden zijn ongewijzigd;
-// alleen de labels zijn nieuw (Migratieplan §1.3). 'afgewezen' is de historische
-// schrijfwijze van 'geannuleerd'.
-const STATUS: Record<
+// Het ontwerp toont één toestand: net aangevraagd. De rest van de statussen komt
+// erbij omdat de link deelbaar is en later opnieuw geopend wordt — ze kleuren
+// alleen de kop en laten het betaalblok weg. De DB-waarden zijn ongewijzigd;
+// 'afgewezen' is de historische schrijfwijze van 'geannuleerd'.
+const KOP: Record<
   string,
-  { titel: string; tekst: string; kleur: string; achtergrond: string }
+  {
+    teken: string
+    kleur: string
+    titel: (voornaam: string) => string
+    regel: string
+  }
 > = {
   nieuw: {
-    titel: 'Aanvraag ontvangen',
-    tekst: 'Rond je betaling af, dan stuurt de organisator je e-ticket.',
-    kleur: '#B45309',
-    achtergrond: '#FEF3C7',
+    teken: '✓',
+    kleur: '#22C55E',
+    titel: (v) => `Bedankt, ${v}!`,
+    regel: 'is ontvangen.',
   },
   betaald: {
-    titel: 'Betaling ontvangen',
-    tekst: 'De organisator maakt je e-ticket klaar. Je krijgt het vanzelf.',
-    kleur: '#1D4ED8',
-    achtergrond: '#DBEAFE',
+    teken: '✓',
+    kleur: '#2563EB',
+    titel: () => 'Betaling ontvangen',
+    regel: 'is betaald. Je e-ticket wordt klaargemaakt.',
   },
   afgehandeld: {
-    titel: 'Ticket verstuurd',
-    tekst: 'Je e-ticket met QR-code is onderweg via WhatsApp of e-mail.',
-    kleur: '#15803D',
-    achtergrond: '#DCFCE7',
+    teken: '🎫',
+    kleur: '#22C55E',
+    titel: () => 'Je ticket is onderweg',
+    regel: 'is afgerond. Je e-ticket met QR-code is verstuurd.',
   },
   geannuleerd: {
-    titel: 'Aanvraag geannuleerd',
-    tekst: 'Deze aanvraag is ingetrokken. Vraag gerust een nieuw ticket aan.',
-    kleur: '#B91C1C',
-    achtergrond: '#FEE2E2',
+    teken: '×',
+    kleur: '#EF4444',
+    titel: () => 'Aanvraag geannuleerd',
+    regel: 'is ingetrokken.',
   },
   afgewezen: {
-    titel: 'Aanvraag geannuleerd',
-    tekst: 'Deze aanvraag is ingetrokken. Vraag gerust een nieuw ticket aan.',
-    kleur: '#B91C1C',
-    achtergrond: '#FEE2E2',
+    teken: '×',
+    kleur: '#EF4444',
+    titel: () => 'Aanvraag geannuleerd',
+    regel: 'is ingetrokken.',
   },
   verlopen: {
-    titel: 'Aanvraag verlopen',
-    tekst: 'Er kwam geen betaling binnen op tijd. Vraag gerust opnieuw aan.',
-    kleur: '#475569',
-    achtergrond: '#F1F5F9',
+    teken: '×',
+    kleur: '#94A3B8',
+    titel: () => 'Aanvraag verlopen',
+    regel: 'is verlopen zonder betaling.',
   },
 }
 
 function AanvraagPagina() {
   const aanvraag = Route.useLoaderData()
   const currency = useCurrency()
-  const status = STATUS[aanvraag.status] ?? STATUS.nieuw
+  const kop = KOP[aanvraag.status] ?? KOP.nieuw
+  const voornaam = aanvraag.naam.trim().split(/\s+/)[0]
   // Betalen heeft alleen zin zolang er nog niets binnen is.
   const nogTeBetalen = aanvraag.status === 'nieuw'
 
   return (
-    <SitePage>
-      <SiteNav active="events" />
-
-      <div className="mx-auto max-w-[680px] px-6 pb-20 pt-8 md:px-12">
-        <div
-          className="mb-6 rounded-[16px] px-6 py-5 text-center"
-          style={{ background: status.achtergrond }}
-        >
-          <div className="mb-1.5 text-[34px]">🎫</div>
-          <h1
-            className="mb-1 text-[24px] font-extrabold"
-            style={{ color: status.kleur }}
+    <main className="min-h-screen bg-white">
+      <div className="mx-auto max-w-[430px]">
+        {/* Kop — donker, met de bevestiging als eerste wat je ziet. */}
+        <div className="bg-[#0F172A] px-[22px] pt-[34px] pb-[30px] text-center">
+          <div
+            className="mx-auto flex h-14 w-14 items-center justify-center rounded-full text-[26px] font-extrabold text-white"
+            style={{ background: kop.kleur }}
           >
-            {status.titel}
-          </h1>
-          <p className="text-[14px]" style={{ color: status.kleur }}>
-            {status.tekst}
-          </p>
-        </div>
-
-        {/* Samenvatting van wat er is aangevraagd */}
-        <div className="mb-6 rounded-[16px] border border-[#E5E7EB] p-6">
-          <h2 className="mb-1 text-[20px] font-extrabold">
-            {aanvraag.eventTitel}
-          </h2>
-          <div className="mb-4 text-[13.5px] text-[#64748B]">
-            {aanvraag.dateLong} · {aanvraag.timeRange}
-            {aanvraag.locatie ? ` · ${aanvraag.locatie}` : ''}
+            {kop.teken}
           </div>
-          <dl className="flex flex-col gap-2.5 border-t border-[#F1F5F9] pt-4">
-            <Regel label="Op naam van">{aanvraag.naam}</Regel>
-            <Regel label="Ticket">
-              {aanvraag.aantal}× {aanvraag.typeNaam}
-            </Regel>
-            <Regel label="Per ticket">
-              {formatPrice(aanvraag.prijsSrd, currency)}
-            </Regel>
-            <div className="mt-1 flex items-center justify-between border-t border-[#F1F5F9] pt-3">
-              <dt className="text-[15px] font-extrabold">Totaal</dt>
-              <dd className="text-[20px] font-extrabold text-[#2563EB]">
-                {formatPrice(aanvraag.totaalSrd, currency)}
-              </dd>
-            </div>
-          </dl>
-          <p className="mt-4 text-[12px] text-[#94A3B8]">
-            Bewaar deze pagina — hier zie je of je betaling verwerkt is.
-          </p>
+          <div className="mt-4 text-[22px] font-extrabold tracking-[-0.01em] text-white">
+            {kop.titel(voornaam)}
+          </div>
+          <div className="mt-1.5 text-[14px] leading-[1.5] text-[#94A3B8]">
+            Je ticketaanvraag voor{' '}
+            <span className="font-bold text-white">{aanvraag.eventTitel}</span>{' '}
+            {kop.regel}
+          </div>
         </div>
 
-        {nogTeBetalen && <Betalen aanvraag={aanvraag} />}
+        <div className="flex flex-col gap-[18px] px-[22px] pt-5 pb-7">
+          {/* Samenvatting: wat, wanneer, hoeveel — één regel, geen tabel. */}
+          <div className="flex items-center justify-between gap-4 rounded-[14px] border border-[#E5E7EB] px-4 py-3.5">
+            <div>
+              <div className="text-[14.5px] font-extrabold">
+                {aanvraag.aantal}× {aanvraag.typeNaam}
+              </div>
+              <div className="mt-0.5 text-[12.5px] text-[#64748B]">
+                {aanvraag.dateLong} · {aanvraag.timeRange}
+              </div>
+            </div>
+            <div className="text-right">
+              <div className="text-[11px] font-bold text-[#64748B]">
+                Te betalen
+              </div>
+              <div className="text-[17px] font-extrabold">
+                {formatPrice(aanvraag.totaalSrd, currency)}
+              </div>
+            </div>
+          </div>
 
-        <Link
-          to="/events/$eventId"
-          params={{ eventId: aanvraag.eventId }}
-          className="mt-6 inline-block text-[13.5px] font-bold text-[#2563EB] hover:text-[#1D4ED8]"
-        >
-          ← Terug naar het event
-        </Link>
+          {nogTeBetalen && <Betalen aanvraag={aanvraag} />}
+
+          <div className="rounded-[14px] bg-[#F8FAFC] px-4 py-3.5 text-[12.5px] leading-[1.55] text-[#475569]">
+            {nogTeBetalen ? (
+              <>
+                Je aanvraag blijft{' '}
+                <strong className="text-[#0F172A]">48 uur</strong> geldig.
+                Vragen? App de organisator direct.
+              </>
+            ) : (
+              <>
+                Vragen over je ticket? Neem contact op met{' '}
+                <strong className="text-[#0F172A]">
+                  {aanvraag.organisator}
+                </strong>
+                .
+              </>
+            )}
+          </div>
+
+          <Link
+            to="/events/$eventId"
+            params={{ eventId: aanvraag.eventId }}
+            className="text-center text-[13px] font-bold text-[#2563EB] hover:text-[#1D4ED8]"
+          >
+            Terug naar het event
+          </Link>
+        </div>
       </div>
-
-      <SiteFooter />
-    </SitePage>
+    </main>
   )
 }
 
 /**
  * Het betaalblok: één kaart per methode die de organisator heeft aangezet, in
- * zijn volgorde, plus zijn instructietekst. Heeft hij niets aangezet, dan blijft
- * alleen die tekst over — vandaar dat de instructies altijd worden getoond.
+ * zijn volgorde. De gegevens komen uit `config` per methode; heeft hij die niet
+ * ingevuld, dan valt de kaart terug op zijn instructietekst. Die tekst staat er
+ * altijd onder — zonder aangezette methoden is het het enige houvast.
  */
 function Betalen({ aanvraag }: { aanvraag: PubliekeAanvraag }) {
-  const waTekst = `Hoi, ik heb ${aanvraag.aantal}× ${aanvraag.typeNaam} aangevraagd voor ${aanvraag.eventTitel} op naam van ${aanvraag.naam}. Hoe kan ik betalen?`
-  const waUrl = whatsappLink(aanvraag.organisatorTelefoon, waTekst)
-
   return (
-    <div className="rounded-[16px] border border-[#E5E7EB] p-6">
-      <h2 className="mb-1 text-[18px] font-extrabold">Zo betaal je</h2>
-      <p className="mb-4 text-[13.5px] text-[#64748B]">
-        Je betaalt rechtstreeks aan {aanvraag.organisator}. Zodra je betaling
-        binnen is, krijg je je e-ticket met QR-code.
-      </p>
-
-      <div className="mb-4 flex flex-col gap-3">
-        {aanvraag.betaalmethoden.includes('whatsapp') &&
-          (waUrl ? (
-            <a
-              href={waUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="flex items-center justify-center gap-2 rounded-full bg-[#16A34A] py-3.5 text-[15px] font-bold text-white hover:bg-[#15803D]"
-            >
-              <svg
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="currentColor"
-              >
-                <path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Zm5.3 14.1c-.2.6-1.3 1.2-1.8 1.2-.5.1-1 .1-1.7-.1a12 12 0 0 1-5.4-4.7c-.4-.6-.9-1.5-.9-2.4 0-.8.4-1.3.6-1.5.2-.2.4-.3.6-.3h.5c.2 0 .4 0 .5.4l.7 1.7c.1.2 0 .4-.1.5l-.3.4c-.1.2-.3.3-.1.6.2.3.7 1.1 1.4 1.8.9.8 1.6 1 1.9 1.2.2.1.4 0 .5-.1l.6-.7c.2-.2.3-.2.5-.1l1.6.8c.2.1.4.2.4.3.1.2.1.6 0 1.1Z" />
-              </svg>
-              Betalen via WhatsApp
-            </a>
-          ) : (
-            <Methode titel="WhatsApp">
-              De organisator handelt de betaling af via WhatsApp. Zijn nummer
-              staat in de instructies hieronder.
-            </Methode>
-          ))}
-        {aanvraag.betaalmethoden.includes('bank') && (
-          <Methode titel="Bankoverschrijving">
-            Maak {aanvraag.aantal}× het ticketbedrag over en vermeld je naam als
-            omschrijving. De rekeninggegevens staan in de instructies hieronder.
-          </Methode>
-        )}
-        {aanvraag.betaalmethoden.includes('contant') && (
-          <Methode titel="Contant">
-            Je kunt contant betalen. Spreek met de organisator af waar en
-            wanneer.
-          </Methode>
-        )}
+    <div>
+      <div className="text-[15.5px] font-extrabold">Voltooi nu je betaling</div>
+      <div className="mt-0.5 mb-3 text-[13px] leading-[1.5] text-[#64748B]">
+        Zodra je betaling binnen is, krijg je je e-ticket met QR-code.
       </div>
 
-      <div className="rounded-[12px] bg-[#F8FAFC] p-4">
-        <div className="mb-1.5 text-[13px] font-extrabold">
-          Instructies van de organisator
-        </div>
-        <p className="whitespace-pre-line text-[13.5px] leading-[1.6] text-[#334155]">
+      <div className="flex flex-col gap-2.5">
+        {aanvraag.betaalmethoden.map((m) => {
+          if (m.soort === 'whatsapp') {
+            return (
+              <WhatsappRij
+                key={m.soort}
+                aanvraag={aanvraag}
+                nummer={m.gegevens.nummer ?? null}
+              />
+            )
+          }
+          if (m.soort === 'bank') {
+            return (
+              <Kaart key={m.soort} titel="Bankoverschrijving">
+                <Regel label="Bank" waarde={m.gegevens.bank} />
+                <Regel label="Rekening" waarde={m.gegevens.rekening} mono />
+                <Regel label="Ten name van" waarde={m.gegevens.tenName} />
+                <Regel label="Kenmerk" waarde={aanvraag.kenmerk} mono laatste />
+              </Kaart>
+            )
+          }
+          if (m.soort === 'contant') {
+            return (
+              <Kaart key={m.soort} titel="Contant">
+                <p className="mt-1 text-[13px] leading-[1.5] text-[#64748B]">
+                  {m.gegevens.tekst ??
+                    'Spreek met de organisator af waar en wanneer je contant betaalt.'}
+                </p>
+              </Kaart>
+            )
+          }
+          return null
+        })}
+      </div>
+
+      {aanvraag.instructies && (
+        <p className="mt-3 text-[12.5px] leading-[1.55] whitespace-pre-line text-[#64748B]">
           {aanvraag.instructies}
-        </p>
-      </div>
-
-      {aanvraag.vervaltOp && (
-        <p className="mt-3 text-[12.5px] font-semibold text-[#B45309]">
-          Rond je betaling af vóór{' '}
-          {new Date(aanvraag.vervaltOp).toLocaleString('nl-NL', {
-            dateStyle: 'full',
-            timeStyle: 'short',
-          })}
-          .
         </p>
       )}
     </div>
   )
 }
 
-function Methode({
+/** WhatsApp is de gebruikelijkste route in Suriname en krijgt daarom de knop. */
+function WhatsappRij({
+  aanvraag,
+  nummer,
+}: {
+  aanvraag: PubliekeAanvraag
+  nummer: string | null
+}) {
+  // Het nummer van de methode, met de organisatie als terugval voor events van
+  // vóór de per-methode velden.
+  const telefoon = nummer ?? aanvraag.organisatorTelefoon
+  const tekst = `Hoi, ik heb ${aanvraag.aantal}× ${aanvraag.typeNaam} aangevraagd voor ${aanvraag.eventTitel} op naam van ${aanvraag.naam}. Kenmerk ${aanvraag.kenmerk}.`
+  const url = whatsappLink(telefoon, tekst)
+
+  if (!url) {
+    return (
+      <Kaart titel="WhatsApp">
+        <p className="mt-1 text-[13px] leading-[1.5] text-[#64748B]">
+          De organisator handelt de betaling af via WhatsApp. Zijn nummer staat
+          in de instructies hieronder.
+        </p>
+      </Kaart>
+    )
+  }
+
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noreferrer"
+      className="flex items-center gap-3 rounded-[14px] bg-[#16A34A] px-4 py-[15px] hover:bg-[#15803D]"
+    >
+      <span className="flex h-[34px] w-[34px] flex-none items-center justify-center rounded-full bg-white/20 text-[15px] font-extrabold text-white">
+        W
+      </span>
+      <span className="flex-1">
+        <span className="block text-[15px] font-extrabold text-white">
+          Betaal via WhatsApp
+        </span>
+        <span className="mt-px block text-[12.5px] text-white/85">
+          Stuur je betaalbewijs naar {telefoon}
+        </span>
+      </span>
+      <span className="flex-none text-[18px] text-white">›</span>
+    </a>
+  )
+}
+
+function Kaart({
   titel,
   children,
 }: {
@@ -225,50 +270,56 @@ function Methode({
   children: React.ReactNode
 }) {
   return (
-    <div className="rounded-[12px] border border-[#E5E7EB] p-4">
-      <div className="mb-1 text-[14.5px] font-extrabold">{titel}</div>
-      <div className="text-[13.5px] leading-[1.6] text-[#64748B]">
-        {children}
-      </div>
+    <div className="rounded-[14px] border border-[#E5E7EB] px-4 py-[15px]">
+      <div className="text-[14.5px] font-extrabold">{titel}</div>
+      {children}
     </div>
   )
 }
 
+/** Regel in de bankkaart. Niet ingevuld = niet tonen, geen lege plek. */
 function Regel({
   label,
-  children,
+  waarde,
+  mono,
+  laatste,
 }: {
   label: string
-  children: React.ReactNode
+  waarde?: string
+  mono?: boolean
+  laatste?: boolean
 }) {
+  if (!waarde) return null
   return (
-    <div className="flex items-center justify-between gap-4">
-      <dt className="text-[13.5px] text-[#64748B]">{label}</dt>
-      <dd className="text-[14px] font-bold">{children}</dd>
+    <div
+      className={`flex justify-between gap-4 py-[5px] text-[13px] ${
+        laatste ? '' : 'border-b border-[#F1F5F9]'
+      }`}
+    >
+      <span className="text-[#64748B]">{label}</span>
+      <span className={mono ? 'font-mono font-medium' : 'font-bold'}>
+        {waarde}
+      </span>
     </div>
   )
 }
 
 function NietGevonden() {
   return (
-    <SitePage>
-      <SiteNav active="events" />
-      <div className="mx-auto max-w-[600px] px-6 py-24 text-center">
-        <h1 className="mb-3 text-[28px] font-extrabold">
-          Aanvraag niet gevonden
-        </h1>
-        <p className="mb-6 text-[15px] text-[#64748B]">
-          Deze link klopt niet of is verlopen. Vraag je ticket opnieuw aan op de
-          eventpagina.
-        </p>
-        <Link
-          to="/events"
-          className="inline-block rounded-full bg-[#2563EB] px-6 py-3 text-[14px] font-bold text-white hover:bg-[#1D4ED8]"
-        >
-          Bekijk alle events
-        </Link>
-      </div>
-      <SiteFooter />
-    </SitePage>
+    <main className="mx-auto max-w-[430px] px-6 py-24 text-center">
+      <h1 className="mb-3 text-[24px] font-extrabold">
+        Aanvraag niet gevonden
+      </h1>
+      <p className="mb-6 text-[14.5px] text-[#64748B]">
+        Deze link klopt niet of is verlopen. Vraag je ticket opnieuw aan op de
+        eventpagina.
+      </p>
+      <Link
+        to="/events"
+        className="inline-block rounded-full bg-[#2563EB] px-6 py-3 text-[14px] font-bold text-white hover:bg-[#1D4ED8]"
+      >
+        Bekijk alle events
+      </Link>
+    </main>
   )
 }

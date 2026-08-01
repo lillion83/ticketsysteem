@@ -159,6 +159,12 @@ function parseFullEventInput(data: FullEventInput): FullEventInput {
     if (!['whatsapp', 'bank', 'contant'].includes(m.soort)) {
       throw new Error('Onbekende betaalmethode')
     }
+    // `config` draagt de gegevens die de bezoeker op zijn bevestigingspagina
+    // ziet (zie src/lib/betaalmethoden.ts). Ruime bovengrens: een handvol
+    // korte velden, geen vrije opslag.
+    if ((m.config?.length ?? 0) > 2000) {
+      throw new Error('Betaalgegevens te lang')
+    }
   }
   return {
     ...data,
