@@ -48,9 +48,25 @@ const rolesByCategory: Record<string, Array<string>> = {
 const defaultRoles = ['DJ', 'Band', 'Zanger', 'MC', 'Spreker']
 const stepLabels = [
   'Event Info',
-  'Tickets & Prijzen',
+  'Tickets verkopen',
   'Controleren & Publiceren',
 ]
+
+// Betaalmethoden die een organisator kan aanzetten. WhatsApp staat bovenaan en
+// draagt "populair": dat is in Suriname verreweg de gebruikelijkste route, en de
+// volgorde in dit lijstje is de volgorde die de bezoeker straks ziet.
+// 'online' (Uni5Pay/Mope) staat er bewust niet in — zie de uitgeschakelde rij
+// in BetaalmethodenKiezer en harde regel 6.
+const BETAALMETHODEN = [
+  { key: 'whatsapp', label: 'WhatsApp', populair: true },
+  { key: 'bank', label: 'Bankoverschrijving', populair: false },
+  { key: 'contant', label: 'Contant', populair: false },
+] as const
+
+type MethodeKey = (typeof BETAALMETHODEN)[number]['key']
+
+const STANDAARD_INSTRUCTIES =
+  'App je betaalbewijs naar +597 … of maak het bedrag over. Vermeld je naam. Je e-ticket met QR-code volgt zodra de betaling binnen is.'
 
 type LineupEntry = { name: string; role: string }
 type Tier = {
@@ -122,6 +138,15 @@ function OrganiseerEvent() {
     },
   ])
   const [nextTierId, setNextTierId] = useState(3)
+  // Verkoopinstellingen (migratie 0012). Default aan: dat is de aanbevolen keuze
+  // en de situatie waar elk bestaand event al in zat.
+  const [verkoopActief, setVerkoopActief] = useState(true)
+  const [methoden, setMethoden] = useState<Array<MethodeKey>>([
+    'whatsapp',
+    'bank',
+    'contant',
+  ])
+  const [instructies, setInstructies] = useState(STANDAARD_INSTRUCTIES)
 
   // Muziek en nachtleven draaien om de line-up, dus die staat daar uitgeklapt.
   const isMusic =
@@ -161,13 +186,23 @@ function OrganiseerEvent() {
       locatie: form.location || null,
       cover_afbeelding_url: cover || null,
       status,
-      tiers: tiers.map((t) => ({
-        naam: t.name,
-        prijs_srd: String(t.priceSRD),
-        aantal_beschikbaar: String(t.qty),
-        features: t.features,
-      })),
+      // Staat de verkoop uit, dan gaan er geen tiers mee: het event komt online
+      // met flyer, datum en locatie, zonder ticketmodule. De server dwingt dit
+      // ook af, maar hier scheelt het een ronde onnodige data.
+      tiers: verkoopActief
+        ? tiers.map((t) => ({
+            naam: t.name,
+            prijs_srd: String(t.priceSRD),
+            aantal_beschikbaar: String(t.qty),
+            features: t.features,
+          }))
+        : [],
       sprekers: lineup.map((l) => ({ naam: l.name, rol: l.role })),
+      verkoop_actief: verkoopActief,
+      betaalinstructies: verkoopActief ? instructies || null : null,
+      betaalmethoden: verkoopActief
+        ? methoden.map((soort) => ({ soort, config: null }))
+        : [],
     }
     setBezig(true)
     try {
@@ -436,142 +471,225 @@ function OrganiseerEvent() {
           </div>
         )}
 
-        {/* Stap 2 — Tickets & Prijzen */}
+        {/* Stap 2 — Tickets verkopen */}
         {step === 2 && (
           <div className="rounded-[18px] border border-[#E5E7EB] p-8">
             <h2 className="mb-6 text-[20px] font-extrabold">
-              Tickets & Prijzen
+              Tickets verkopen
             </h2>
-            <div className="flex flex-col gap-5">
-              {tiers.map((t) => (
-                <div
-                  key={t.id}
-                  className="relative rounded-[16px] border border-[#E5E7EB] p-[22px]"
-                >
-                  <button
-                    onClick={() =>
-                      setTiers((ts) => ts.filter((x) => x.id !== t.id))
-                    }
-                    className="absolute right-4 top-4 text-[13px] font-bold text-[#94A3B8] hover:text-[#EF4444]"
-                  >
-                    Verwijderen ✕
-                  </button>
-                  <div className="mb-4 grid gap-4 sm:grid-cols-[2fr_1fr]">
-                    <SmallField label="Tiernaam">
-                      <SmallInput
-                        value={t.name}
-                        onChange={(v) => updateTier(t.id, 'name', v)}
-                      />
-                    </SmallField>
-                    <SmallField label="Beschikbaar aantal">
-                      <SmallInput
-                        type="number"
-                        value={String(t.qty)}
-                        onChange={(v) => updateTier(t.id, 'qty', Number(v))}
-                      />
-                    </SmallField>
-                  </div>
-                  <div className="mb-4">
-                    <SmallField label="Beschrijving">
-                      <SmallInput
-                        value={t.desc}
-                        onChange={(v) => updateTier(t.id, 'desc', v)}
-                      />
-                    </SmallField>
-                  </div>
-                  <div className="mb-4 grid gap-4 sm:grid-cols-2">
-                    <SmallField label="Prijs SRD">
-                      <SmallInput
-                        type="number"
-                        value={String(t.priceSRD)}
-                        onChange={(v) =>
-                          updateTier(t.id, 'priceSRD', Number(v))
-                        }
-                      />
-                    </SmallField>
-                  </div>
-                  <div className="mb-3.5">
-                    <label className="mb-2 block text-[12.5px] font-bold">
-                      Features
-                    </label>
-                    <div className="flex flex-col gap-2">
-                      {t.features.map((f, idx) => (
-                        <div key={idx} className="flex items-center gap-2">
-                          <svg
-                            width="14"
-                            height="14"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="#2563EB"
-                            strokeWidth="2.5"
-                            className="flex-none"
-                          >
-                            <path d="M20 6 9 17l-5-5" />
-                          </svg>
-                          <input
-                            value={f}
-                            onChange={(e) =>
-                              updateTier(
-                                t.id,
-                                'features',
-                                t.features.map((x, i) =>
-                                  i === idx ? e.target.value : x,
-                                ),
-                              )
-                            }
-                            className="flex-1 rounded-[8px] border border-[#E5E7EB] bg-[#F8FAFC] px-2.5 py-2 text-[13.5px] outline-none focus:border-[#2563EB]"
-                          />
-                          <button
-                            onClick={() =>
-                              updateTier(
-                                t.id,
-                                'features',
-                                t.features.filter((_, i) => i !== idx),
-                              )
-                            }
-                            className="text-[13px] text-[#94A3B8] hover:text-[#EF4444]"
-                          >
-                            ✕
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                    <button
-                      onClick={() =>
-                        updateTier(t.id, 'features', [...t.features, ''])
-                      }
-                      className="mt-2.5 text-[13px] font-bold text-[#2563EB] hover:text-[#1D4ED8]"
-                    >
-                      + Kenmerk toevoegen
-                    </button>
-                  </div>
-                  <label className="flex cursor-pointer items-center gap-2 text-[13.5px] font-semibold">
-                    <input
-                      type="checkbox"
-                      checked={t.earlyBird}
-                      onChange={() =>
-                        updateTier(t.id, 'earlyBird', !t.earlyBird)
-                      }
-                      className="h-4 w-4 accent-[#2563EB]"
-                    />
-                    Vroegboekkorting
-                  </label>
-                  {t.earlyBird && (
-                    <div className="mt-2.5 text-[13px] text-[#64748B]">
-                      Originele prijs (doorgestreept):{' '}
-                      <s>SRD {t.earlyBirdOriginalSRD}</s> /{' '}
-                      <s>${t.earlyBirdOriginalUSD}</s>
-                    </div>
-                  )}
-                </div>
-              ))}
+
+            <VerkoopPromoKaart />
+
+            <div className="mt-5 flex flex-col gap-2.5">
+              <KeuzeKaart
+                gekozen={verkoopActief}
+                onKies={() => setVerkoopActief(true)}
+                titel="Ja, zet digitale ticketverkoop aan"
+                uitleg="Aanbevolen — bezoekers kunnen direct aanvragen"
+              />
+              <KeuzeKaart
+                gekozen={!verkoopActief}
+                onKies={() => setVerkoopActief(false)}
+                titel="Nee, ik regel mijn ticketverkoop zelf"
+                uitleg="Je event krijgt alleen flyer en informatie"
+              />
             </div>
-            <button
-              onClick={addTier}
-              className="mt-5 rounded-full border border-[#2563EB] bg-white px-[22px] py-3 text-[14px] font-bold text-[#2563EB] hover:bg-[#EFF6FF]"
-            >
-              + Ticket Tier Toevoegen
-            </button>
+
+            {!verkoopActief ? (
+              <p className="mt-5 rounded-[14px] border border-[#E5E7EB] bg-[#F8FAFC] p-4 text-[13.5px] leading-relaxed text-[#475569]">
+                Prima. Je event komt online met flyer, datum en locatie. Geen
+                ticketmodule. Je kunt dit later altijd nog aanzetten.
+              </p>
+            ) : (
+              <div className="mt-7 flex flex-col gap-7">
+                <div>
+                  <h3 className="mb-3 text-[15px] font-extrabold">
+                    Je tickets
+                  </h3>
+                  <div className="flex flex-col gap-4">
+                    {tiers.map((t) => (
+                      <div
+                        key={t.id}
+                        className="relative rounded-[16px] border border-[#E5E7EB] p-[22px]"
+                      >
+                        <button
+                          onClick={() =>
+                            setTiers((ts) => ts.filter((x) => x.id !== t.id))
+                          }
+                          className="absolute right-4 top-4 text-[13px] font-bold text-[#94A3B8] hover:text-[#EF4444]"
+                        >
+                          Verwijderen ✕
+                        </button>
+                        {/* Naam, prijs en aantal zijn het enige wat je nodig
+                            hebt om live te gaan; de rest zit achter Meer
+                            opties. */}
+                        <div className="mb-4 pr-24">
+                          <SmallField label="Naam">
+                            <SmallInput
+                              value={t.name}
+                              onChange={(v) => updateTier(t.id, 'name', v)}
+                            />
+                          </SmallField>
+                        </div>
+                        <div className="grid gap-4 sm:grid-cols-2">
+                          <SmallField label="Prijs (SRD)">
+                            <SmallInput
+                              type="number"
+                              value={String(t.priceSRD)}
+                              onChange={(v) =>
+                                updateTier(t.id, 'priceSRD', Number(v))
+                              }
+                            />
+                          </SmallField>
+                          <SmallField label="Hoeveel?">
+                            <SmallInput
+                              type="number"
+                              value={String(t.qty)}
+                              onChange={(v) =>
+                                updateTier(t.id, 'qty', Number(v))
+                              }
+                            />
+                          </SmallField>
+                        </div>
+                        <div className="mt-3.5 rounded-[10px] bg-[#F0FDF4] px-3 py-2.5 text-[12.5px] leading-relaxed text-[#166534]">
+                          Jij ontvangt <strong>SRD {t.priceSRD}</strong> per
+                          ticket. Platformkosten: <strong>SRD 0</strong> —
+                          tijdelijk gratis.
+                        </div>
+
+                        <details className="mt-3.5">
+                          <summary className="cursor-pointer text-[13px] font-bold text-[#2563EB] hover:text-[#1D4ED8]">
+                            Meer opties
+                          </summary>
+                          <div className="mt-4 flex flex-col gap-4 border-t border-[#F1F5F9] pt-4">
+                            <SmallField label="Beschrijving">
+                              <SmallInput
+                                value={t.desc}
+                                onChange={(v) => updateTier(t.id, 'desc', v)}
+                              />
+                            </SmallField>
+                            <div>
+                              <label className="mb-2 block text-[12.5px] font-bold">
+                                Kenmerken
+                              </label>
+                              <div className="flex flex-col gap-2">
+                                {t.features.map((f, idx) => (
+                                  <div
+                                    key={idx}
+                                    className="flex items-center gap-2"
+                                  >
+                                    <svg
+                                      width="14"
+                                      height="14"
+                                      viewBox="0 0 24 24"
+                                      fill="none"
+                                      stroke="#2563EB"
+                                      strokeWidth="2.5"
+                                      className="flex-none"
+                                    >
+                                      <path d="M20 6 9 17l-5-5" />
+                                    </svg>
+                                    <input
+                                      value={f}
+                                      onChange={(e) =>
+                                        updateTier(
+                                          t.id,
+                                          'features',
+                                          t.features.map((x, i) =>
+                                            i === idx ? e.target.value : x,
+                                          ),
+                                        )
+                                      }
+                                      className="flex-1 rounded-[8px] border border-[#E5E7EB] bg-[#F8FAFC] px-2.5 py-2 text-[13.5px] outline-none focus:border-[#2563EB]"
+                                    />
+                                    <button
+                                      onClick={() =>
+                                        updateTier(
+                                          t.id,
+                                          'features',
+                                          t.features.filter(
+                                            (_, i) => i !== idx,
+                                          ),
+                                        )
+                                      }
+                                      className="text-[13px] text-[#94A3B8] hover:text-[#EF4444]"
+                                    >
+                                      ✕
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                              <button
+                                onClick={() =>
+                                  updateTier(t.id, 'features', [
+                                    ...t.features,
+                                    '',
+                                  ])
+                                }
+                                className="mt-2.5 text-[13px] font-bold text-[#2563EB] hover:text-[#1D4ED8]"
+                              >
+                                + Kenmerk toevoegen
+                              </button>
+                            </div>
+                            <label className="flex cursor-pointer items-center gap-2 text-[13.5px] font-semibold">
+                              <input
+                                type="checkbox"
+                                checked={t.earlyBird}
+                                onChange={() =>
+                                  updateTier(t.id, 'earlyBird', !t.earlyBird)
+                                }
+                                className="h-4 w-4 accent-[#2563EB]"
+                              />
+                              Vroegboekkorting
+                            </label>
+                            {t.earlyBird && (
+                              <div className="text-[13px] text-[#64748B]">
+                                Originele prijs (doorgestreept):{' '}
+                                <s>SRD {t.earlyBirdOriginalSRD}</s> /{' '}
+                                <s>${t.earlyBirdOriginalUSD}</s>
+                              </div>
+                            )}
+                          </div>
+                        </details>
+                      </div>
+                    ))}
+                  </div>
+                  <button
+                    onClick={addTier}
+                    className="mt-4 w-full rounded-[12px] border border-dashed border-[#93C5FD] bg-[#F8FAFC] px-[22px] py-3 text-[13.5px] font-extrabold text-[#2563EB] hover:bg-[#EFF6FF]"
+                  >
+                    + Nog een tickettype
+                  </button>
+                </div>
+
+                <BetaalmethodenKiezer
+                  gekozen={methoden}
+                  onToggle={(key) =>
+                    setMethoden((m) =>
+                      m.includes(key)
+                        ? m.filter((x) => x !== key)
+                        : [...m, key],
+                    )
+                  }
+                />
+
+                <div>
+                  <h3 className="text-[15px] font-extrabold">
+                    Betaalinstructies
+                  </h3>
+                  <p className="mb-2.5 mt-0.5 text-[12.5px] text-[#64748B]">
+                    Deze tekst krijgt de bezoeker direct na zijn aanvraag te
+                    zien.
+                  </p>
+                  <textarea
+                    value={instructies}
+                    onChange={(e) => setInstructies(e.target.value)}
+                    rows={5}
+                    className="w-full resize-y rounded-[12px] border border-[#E5E7EB] bg-[#F8FAFC] p-3 text-[13.5px] leading-relaxed outline-none focus:border-[#2563EB]"
+                  />
+                </div>
+              </div>
+            )}
 
             <div className="mt-8 flex justify-between">
               <SecondaryButton onClick={() => setStep(1)}>
@@ -653,26 +771,59 @@ function OrganiseerEvent() {
 
             <div className="mb-8 rounded-[16px] border border-[#E5E7EB] p-[26px]">
               <h3 className="mb-4 text-[17px] font-extrabold">Tickets</h3>
-              <div className="flex flex-col gap-3">
-                {tiers.map((t) => (
-                  <div
-                    key={t.id}
-                    className="flex items-center justify-between rounded-[12px] border border-[#E5E7EB] p-[14px_18px]"
-                  >
-                    <div>
-                      <div className="text-[14.5px] font-extrabold">
-                        {t.name}
+              {!verkoopActief ? (
+                <p className="text-[13.5px] leading-relaxed text-[#64748B]">
+                  Digitale ticketverkoop staat uit. Je event komt online met
+                  flyer, datum en locatie — bezoekers kunnen hier geen ticket
+                  aanvragen. Later aanzetten kan altijd.
+                </p>
+              ) : (
+                <>
+                  <div className="flex flex-col gap-3">
+                    {tiers.map((t) => (
+                      <div
+                        key={t.id}
+                        className="flex items-center justify-between rounded-[12px] border border-[#E5E7EB] p-[14px_18px]"
+                      >
+                        <div>
+                          <div className="text-[14.5px] font-extrabold">
+                            {t.name}
+                          </div>
+                          <div className="text-[12.5px] text-[#64748B]">
+                            {t.qty} beschikbaar
+                          </div>
+                        </div>
+                        <div className="font-extrabold text-[#2563EB]">
+                          SRD {t.priceSRD}
+                        </div>
                       </div>
-                      <div className="text-[12.5px] text-[#64748B]">
-                        {t.qty} beschikbaar
-                      </div>
-                    </div>
-                    <div className="font-extrabold text-[#2563EB]">
-                      SRD {t.priceSRD}
-                    </div>
+                    ))}
                   </div>
-                ))}
-              </div>
+                  <div className="mt-4 border-t border-[#F1F5F9] pt-4">
+                    <div className="mb-2 text-[12px] font-extrabold uppercase tracking-wide text-[#64748B]">
+                      Betalen via
+                    </div>
+                    {methoden.length === 0 ? (
+                      <span className="text-[13px] text-[#64748B]">
+                        Geen methode gekozen — alleen je instructies.
+                      </span>
+                    ) : (
+                      <div className="flex flex-wrap gap-2">
+                        {BETAALMETHODEN.filter((m) =>
+                          methoden.includes(m.key),
+                        ).map((m) => (
+                          <span
+                            key={m.key}
+                            className="rounded-full bg-[#F1F5F9] px-3 py-1.5 text-[12.5px] font-bold text-[#334155]"
+                          >
+                            {m.label}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
 
             {fout && (
@@ -703,6 +854,137 @@ function OrganiseerEvent() {
         )}
       </div>
     </SitePage>
+  )
+}
+
+// ── Ticketverkoop-stap ───────────────────────────────────────────────────────
+
+/**
+ * Commerciële uitleg bovenaan stap 2. Het belangrijkste dat hier staat: de
+ * organisator hoeft zijn manier van geld ontvangen niet te veranderen. Dat is
+ * de drempel — niet de QR-code.
+ */
+function VerkoopPromoKaart() {
+  return (
+    <div className="rounded-[16px] border border-[#DBEAFE] bg-[#EFF6FF] p-[18px]">
+      <div className="inline-flex items-center rounded-full bg-[#2563EB] px-2.5 py-1 text-[11px] font-extrabold tracking-wide text-white">
+        TIJDELIJK GRATIS
+      </div>
+      <div className="mt-2.5 text-[16.5px] font-extrabold leading-snug">
+        Verkoop meer tickets met digitale e-tickets
+      </div>
+      <p className="mt-2 text-[13.5px] leading-relaxed text-[#334155]">
+        Bezoekers vragen hun ticket online aan. Je ontvangt de betaling gewoon
+        zoals je gewend bent — via WhatsApp, contant of bank. Na ontvangst stuur
+        je met één klik een professioneel e-ticket met QR-code.
+      </p>
+    </div>
+  )
+}
+
+/** Radio-achtige keuzekaart; het hele blok is klikbaar, niet alleen de stip. */
+function KeuzeKaart({
+  gekozen,
+  onKies,
+  titel,
+  uitleg,
+}: {
+  gekozen: boolean
+  onKies: () => void
+  titel: string
+  uitleg: string
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onKies}
+      aria-pressed={gekozen}
+      className={`flex items-start gap-3 rounded-[14px] border bg-white p-4 text-left ${
+        gekozen ? 'border-[#2563EB]' : 'border-[#E5E7EB] hover:border-[#93C5FD]'
+      }`}
+    >
+      <span
+        className={`mt-0.5 h-[18px] w-[18px] flex-none rounded-full bg-white ${
+          gekozen
+            ? 'border-[5px] border-[#2563EB]'
+            : 'border-2 border-[#CBD5E1]'
+        }`}
+      />
+      <span>
+        <span className="block text-[14.5px] font-extrabold">{titel}</span>
+        <span className="mt-0.5 block text-[12.5px] text-[#64748B]">
+          {uitleg}
+        </span>
+      </span>
+    </button>
+  )
+}
+
+/**
+ * Welke betaalmethoden de bezoeker straks te zien krijgt. De rij "Uni5Pay &
+ * Mope" staat er uitgeschakeld bij: online betalen bestaat niet (harde regel 6),
+ * en de lege plek uitleggen werkt beter dan hem verzwijgen.
+ */
+function BetaalmethodenKiezer({
+  gekozen,
+  onToggle,
+}: {
+  gekozen: Array<MethodeKey>
+  onToggle: (key: MethodeKey) => void
+}) {
+  return (
+    <div>
+      <h3 className="text-[15px] font-extrabold">
+        Hoe kunnen bezoekers betalen?
+      </h3>
+      <p className="mb-2.5 mt-0.5 text-[12.5px] text-[#64748B]">
+        Dit zien bezoekers na hun aanvraag.
+      </p>
+      <div className="flex flex-col gap-2">
+        {BETAALMETHODEN.map((m) => {
+          const aan = gekozen.includes(m.key)
+          return (
+            <button
+              key={m.key}
+              type="button"
+              onClick={() => onToggle(m.key)}
+              aria-pressed={aan}
+              className="flex w-full items-center gap-3 rounded-[12px] border border-[#E5E7EB] bg-white px-3.5 py-3 text-left hover:border-[#93C5FD]"
+            >
+              <span
+                className={`flex h-5 w-5 flex-none items-center justify-center rounded-[6px] text-[12px] font-extrabold ${
+                  aan
+                    ? 'bg-[#2563EB] text-white'
+                    : 'border-[1.5px] border-[#CBD5E1] bg-white'
+                }`}
+              >
+                {aan ? '✓' : ''}
+              </span>
+              <span className="flex-1 text-[14px] font-bold">{m.label}</span>
+              {m.populair && aan && (
+                <span className="flex-none rounded-full bg-[#DCFCE7] px-2 py-[3px] text-[11px] font-extrabold text-[#16A34A]">
+                  populair
+                </span>
+              )}
+            </button>
+          )
+        })}
+        <div className="flex items-center gap-3 rounded-[12px] border border-dashed border-[#E5E7EB] px-3.5 py-3 opacity-70">
+          <span className="h-5 w-5 flex-none rounded-[6px] border-[1.5px] border-[#E2E8F0] bg-[#F8FAFC]" />
+          <span className="flex-1 text-[13.5px] font-semibold text-[#94A3B8]">
+            Uni5Pay &amp; Mope
+          </span>
+          <span className="text-[11px] font-extrabold text-[#94A3B8]">
+            binnenkort
+          </span>
+        </div>
+      </div>
+      {gekozen.length === 0 && (
+        <p className="mt-2 text-[12.5px] font-semibold text-[#B45309]">
+          Zonder betaalmethode ziet de bezoeker alleen je instructies hieronder.
+        </p>
+      )}
+    </div>
   )
 }
 
