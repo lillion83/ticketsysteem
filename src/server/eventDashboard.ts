@@ -63,7 +63,17 @@ export type EventDashboardData = {
   // zelf per tijdvak; onder de 200 tickets per event is dat verwaarloosbaar.
   verkoopmomenten: Array<string>
   kanalen: Array<DashboardKanaal>
-  reserveringen: { aangevraagd: number; afgehandeld: number; afgewezen: number }
+  // Aantallen per status van de ticketaanvragen. `geannuleerd` telt de
+  // historische waarde 'afgewezen' mee: die schrijven we sinds migratie 0012
+  // niet meer, maar oude rijen dragen hem nog (Migratieplan §1.3).
+  ticketaanvragen: {
+    aangevraagd: number
+    wachtOpBetaling: number
+    betaald: number
+    afgehandeld: number
+    geannuleerd: number
+    verlopen: number
+  }
   scans: {
     totaal: number
     laatsteUur: number
@@ -178,11 +188,14 @@ export const getEventDashboard = createServerFn({ method: 'GET' })
       .groupBy(tickets.verkoopkanaal)
       .orderBy(desc(sql`count(*)`))
 
-    const [reserveringRij] = await db
+    const [aanvraagRij] = await db
       .select({
         aangevraagd: sql<number>`count(*)`,
+        wachtOpBetaling: sql<number>`count(*) filter (where ${reserveringen.status} = 'nieuw')`,
+        betaald: sql<number>`count(*) filter (where ${reserveringen.status} = 'betaald')`,
         afgehandeld: sql<number>`count(*) filter (where ${reserveringen.status} = 'afgehandeld')`,
-        afgewezen: sql<number>`count(*) filter (where ${reserveringen.status} = 'afgewezen')`,
+        geannuleerd: sql<number>`count(*) filter (where ${reserveringen.status} in ('geannuleerd', 'afgewezen'))`,
+        verlopen: sql<number>`count(*) filter (where ${reserveringen.status} = 'verlopen')`,
       })
       .from(reserveringen)
       .where(
@@ -288,10 +301,13 @@ export const getEventDashboard = createServerFn({ method: 'GET' })
         naam: r.naam ?? 'Onbekend',
         aantal: Number(r.aantal),
       })),
-      reserveringen: {
-        aangevraagd: Number(reserveringRij.aangevraagd),
-        afgehandeld: Number(reserveringRij.afgehandeld),
-        afgewezen: Number(reserveringRij.afgewezen),
+      ticketaanvragen: {
+        aangevraagd: Number(aanvraagRij.aangevraagd),
+        wachtOpBetaling: Number(aanvraagRij.wachtOpBetaling),
+        betaald: Number(aanvraagRij.betaald),
+        afgehandeld: Number(aanvraagRij.afgehandeld),
+        geannuleerd: Number(aanvraagRij.geannuleerd),
+        verlopen: Number(aanvraagRij.verlopen),
       },
       scans: { totaal: scanTotaal, laatsteUur, piekUur, piekAantal },
       kopers: koperRows.map((r) => ({

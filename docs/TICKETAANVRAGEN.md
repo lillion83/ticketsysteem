@@ -39,7 +39,7 @@ Interne namen (de tabel `reserveringen`, het type `Leverkanaal`) blijven staan.
 | 5   | Eventformulier: promokaart, ja/nee, betaalmethoden | ✅             |
 | 6   | Publieke pagina + bevestigingspagina bezoeker      | ✅             |
 | 7   | `payments/`-map met alleen de handmatige provider  | ✅ (vervroegd) |
-| 8   | Opruimen: re-exports weg, `afgewezen` uitfaseren   | openstaand     |
+| 8   | Opruimen: re-exports weg, `afgewezen` uitfaseren   | ✅             |
 
 Het flyer-uploadscherm dat titel, datum en locatie automatisch uitleest (stap 0
 van het ontwerp) staat bewust **buiten scope**: dat vraagt een vision-model en
@@ -92,8 +92,8 @@ statuscontrole verschilt. De voorraadbewaking
 (`aantal_verkocht + n <= aantal_beschikbaar`) is intact — geen rij terug is
 uitverkocht.
 
-`src/server/reserveringen.ts` re-exporteert de oude namen nog één release, zodat
-een gemiste importplek niet stilletjes breekt. Weg in stap 8.
+`src/server/reserveringen.ts` re-exporteerde de oude namen één release als brug.
+Dat bestand is in stap 8 verwijderd; importeer uit `#/server/ticketaanvragen`.
 
 ### `ticketsVoorAanvraag` is een benadering
 
@@ -171,6 +171,32 @@ verifieerWebhook(req)
 ```
 
 Er is bewust nog **geen** webhookroute. Die komt pas als er een provider is.
+
+## 8. Opruimen
+
+`src/server/reserveringen.ts` is weg — niets importeerde er nog uit.
+
+`afgewezen` is uitgefaseerd: geen enkele codepad schrijft die status nog,
+`annuleerTicketaanvraag` zet `geannuleerd`. De waarde blijft wél in de enum
+staan, want Postgres kan een enumwaarde niet droppen zolang oude rijen hem
+dragen, en die rijen omzetten is een datamigratie zonder opbrengst. De regel is
+daarom: **wie statussen leest, telt `afgewezen` bij `geannuleerd`.** Zo doet de
+admin het al, en sinds deze stap ook het dashboard.
+
+Het dashboard telde alleen `afgewezen` en zag nieuwe annuleringen dus helemaal
+niet meer. `EventDashboardData.reserveringen` heet nu `ticketaanvragen` en telt
+zes statussen apart. De trechter gaat van Ticketaanvragen → Betaling ontvangen →
+Tickets verzonden → Ingecheckt, er is een KPI "Wacht op betaling" in de fase vóór
+het event, en de inzichtregels benoemen betaling in plaats van "verwerking".
+
+Het woord "reservering" komt nu nergens meer in de UI voor. In de code staat het
+alleen nog waar het een DB-naam spiegelt: de tabel `reserveringen` en het oude
+verkoopkanaal `'reservering'`.
+
+**Nog open, buiten dit migratieplan:** niets zet een aanvraag ooit op `verlopen`.
+`vervalt_op` wordt gevuld en de bevestigingspagina toont de datum, maar er is geen
+taak die de status omzet. Dat vraagt een cron of een check bij het lezen — een
+eigen beslissing, geen opruimwerk.
 
 ## Wat expliciet niet gebeurt
 

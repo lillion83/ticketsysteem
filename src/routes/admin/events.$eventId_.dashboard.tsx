@@ -374,6 +374,16 @@ function kpisVoorFase(
         glyph: '🎟',
       },
       {
+        label: 'Wacht op betaling',
+        waarde: String(data.ticketaanvragen.wachtOpBetaling),
+        sub:
+          data.ticketaanvragen.betaald > 0
+            ? `${data.ticketaanvragen.betaald} betaald, ticket nog niet verstuurd`
+            : 'Ticketaanvragen zonder betaling',
+        subKleur: data.ticketaanvragen.betaald > 0 ? ORANJE : GRIJS,
+        glyph: '⏳',
+      },
+      {
         label: 'Bruto waarde',
         waarde: formatPrice(data.brutoSrd, 'SRD'),
         sub: `Indicatie · marge ${formatPrice(margeSrd, 'SRD')}`,
@@ -897,16 +907,22 @@ function KanalenPaneel({ data }: { data: EventDashboardData }) {
   )
 }
 
-// ── Trechter (reserveringen → deur) ──────────────────────────────────────────
+// ── Trechter (ticketaanvraag → deur) ─────────────────────────────────────────
 
 function TrechterPaneel({ data }: { data: EventDashboardData }) {
-  const r = data.reserveringen
+  const a = data.ticketaanvragen
   const stappen = [
-    { label: 'Reserveringen aangevraagd', waarde: r.aangevraagd, basis: 0 },
+    { label: 'Ticketaanvragen', waarde: a.aangevraagd, basis: 0 },
     {
-      label: 'Reserveringen afgehandeld',
-      waarde: r.afgehandeld,
-      basis: r.aangevraagd,
+      label: 'Betaling ontvangen',
+      // Betaald én verstuurd: wie een ticket heeft, heeft betaald.
+      waarde: a.betaald + a.afgehandeld,
+      basis: a.aangevraagd,
+    },
+    {
+      label: 'Tickets verzonden',
+      waarde: a.afgehandeld,
+      basis: a.aangevraagd,
     },
     { label: 'Tickets uitgegeven', waarde: data.uitgegeven, basis: 0 },
     {
@@ -1253,12 +1269,17 @@ function bouwInzichten(data: EventDashboardData, start: Date): Array<string> {
     )
   }
 
-  if (data.reserveringen.aangevraagd > 0) {
-    const open =
-      data.reserveringen.aangevraagd -
-      data.reserveringen.afgehandeld -
-      data.reserveringen.afgewezen
-    if (open > 0) uit.push(`${open} reserveringen wachten nog op verwerking.`)
+  const wacht = data.ticketaanvragen.wachtOpBetaling
+  if (wacht > 0) {
+    uit.push(
+      `${wacht} ${wacht === 1 ? 'ticketaanvraag wacht' : 'ticketaanvragen wachten'} nog op betaling.`,
+    )
+  }
+  const betaald = data.ticketaanvragen.betaald
+  if (betaald > 0) {
+    uit.push(
+      `${betaald} betaalde ${betaald === 1 ? 'aanvraag heeft' : 'aanvragen hebben'} nog geen ticket ontvangen.`,
+    )
   }
 
   if (data.gebruikt > 0) {

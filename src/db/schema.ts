@@ -26,9 +26,14 @@ export const scanResultaat = pgEnum('scan_resultaat', [
 // nieuw       → UI "Wacht op betaling"
 // betaald     → UI "Betaald — klaar om te sturen" (migratie 0012)
 // afgehandeld → UI "Ticket verzonden / Afgerond"
-// afgewezen   → UI "Geannuleerd" (historisch; nieuwe rijen krijgen 'geannuleerd')
 // geannuleerd → expliciet ingetrokken door de organisator (migratie 0012)
 // verlopen    → vervalt_op gepasseerd zonder betaling (migratie 0012)
+//
+// 'afgewezen' is UITGEFASEERD (Migratieplan §6.8): sinds migratie 0012 schrijft
+// niets het meer, 'geannuleerd' heeft het vervangen. De waarde blijft in de enum
+// staan omdat Postgres een enumwaarde niet kan droppen zolang oude rijen hem
+// dragen — en die rijen weg-updaten is een datamigratie zonder opbrengst. Lees je
+// statussen, dan hoort 'afgewezen' overal bij 'geannuleerd'.
 export const reserveringStatus = pgEnum('reservering_status', [
   'nieuw',
   'afgehandeld',
